@@ -1,6 +1,6 @@
 
 {
-  "apiBaseUrl": "",
+  "apiBaseUrl": "telegram-gateway-production-72f0.up.railway.app",
   "supabaseUrl": "https://wkwxefckzwdlfrariqqn.supabase.co",
   "supabasePublishableKey": "sb_publishable_Hh6GfPSQ6YUVSCG8yDTgZw_lTexep6f",
   "introVideo": "",
