@@ -1,1 +1,13 @@
-{"apiBaseUrl":"","supabaseUrl":"","supabasePublishableKey":"","introVideo":"","ambientVideo":"","termsUrl":"","privacyUrl":"","supportTelegram":"","supportEmail":"","faqUrl":""}
+
+{
+  "apiBaseUrl": "",
+  "supabaseUrl": "https://wkwxefckzwdlfrariqqn.supabase.co",
+  "supabasePublishableKey": "sb_publishable_Hh6GfPSQ6YUVSCG8yDTgZw_lTexep6f",
+  "introVideo": "",
+  "ambientVideo": "",
+  "termsUrl": "https://telegra.ph/Polzovatelskoe-soglashenie-09-04-45",
+  "privacyUrl": "https://telegra.ph/Politika-konfidencialnosti-09-04-77",
+  "supportTelegram": "",
+  "supportEmail": "",
+  "faqUrl": ""
+}
