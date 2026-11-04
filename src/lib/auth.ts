@@ -1,0 +1,7 @@
+import {createClient,type Session} from '@supabase/supabase-js';
+import {config,isConfigured} from './config';
+let client:ReturnType<typeof createClient>|null=null;
+export function auth(){if(!isConfigured())throw new Error('Вход станет доступен после подключения сервиса.');return client??=createClient(config.supabaseUrl,config.supabasePublishableKey,{auth:{flowType:'pkce',persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});}
+export async function getToken(){if(!isConfigured())return null;const {data,error}=await auth().auth.getSession();if(error)throw error;return data.session?.access_token??null;}
+export function localeLanguage(locale?:string,supported:string[]=['ru','en']):string|null{if(!locale?.trim())return null;const normalized=locale.trim().toLowerCase().replaceAll('_','-'),parts=normalized.split('-'),language=parts[0],country=parts.slice(1).find(p=>p.length===2);const exact=supported.find(l=>l.toLowerCase()===normalized)||supported.find(l=>l.toLowerCase()===language);if(exact)return exact;const fallback=['uk','be','kk','ky','tg','uz','tk','hy','az','mo'].includes(language)||['ru','by','ua','kz','kg','tj','uz','tm','am','az','md'].includes(country??'')?'ru':'en';return supported.includes(fallback)?fallback:null;}
+export function sessionLocale(session:Session,supported:string[]=['ru','en']){const meta=session.user.user_metadata;return localeLanguage(typeof meta.locale==='string'?meta.locale:typeof navigator!=='undefined'?navigator.language:undefined,supported);}

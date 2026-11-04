@@ -1,0 +1,17 @@
+MIDNIGHT PERSONA FRONTEND — ПЕРЕДАЧА 03.11.2026
+
+Содержимое frontend/ — полный исходный проект. Существующие Midnight Violet assets и дизайн сохранены. Исходная база взята из sites/midnight-persona-web: названный в ТЗ ZIP violet(1) не был предоставлен.
+
+Подключать только вместе с Gateway/новыми SQL/n8n из общего ZIP. README.md и общий docs/CONTRACT_MATRIX.md описывают фактические контракты. Старую ветку web не использовать как текущую основу.
+
+Проверено: pnpm install --frozen-lockfile, pnpm check, pnpm test (17/17), pnpm build. Сборка под Windows потребовала выхода esbuild из файлового sandbox; production-сервисы не затронуты. Существующие Motion use-client и chunk-size warnings сборку не останавливают.
+
+Словари localization/{ru,en}/{web,commerce}.json импортируются общей SQL-миграцией; не заменять существующие данные Telegram. commerce.product_types использует semantic feature/tier keys, а не придуманные SKU. Имена продуктов, цены и права определяет Gateway.
+
+public/config.json намеренно оставлен с пустыми непредоставленными реальными URL/key/contact полями. После ручного заполнения выполнить сборку. Service role, payment secrets, Telegram token и n8n credentials в браузер не переносить.
+
+Встроенные QA fixtures исключены из итоговой поставки. Локальные тесты и браузерные фикстуры не подтверждают реальные OAuth, Telegram linking, IPN, приватный Storage и скрытый Writer E2E. Коммиты, push, migrations/import/deploy и реальные оплаты исполнителем не выполнялись.
+
+
+Фотопанель: доступны серверные предыдущая/следующая/ещё фото, сохранены существующие права и лимит панели. Новое закрытое предложение не раскрывает URL. Полноэкранный просмотр переключает только уже доступные фото и сохраняет место в истории при закрытии.
+

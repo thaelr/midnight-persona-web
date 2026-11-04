@@ -1,0 +1,14 @@
+{
+  "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/manrope/Manrope%5Bwght%5D.ttf",
+  "sha256": "3ae11c49db0455a3cc33e37d380f20fdb8c7f8b41dc07625c177e3d87a9d6ae6",
+  "bytes": 164700,
+  "axes": [
+    {
+      "tag": "wght",
+      "min": 200.0,
+      "max": 800.0
+    }
+  ],
+  "glyphs": 678,
+  "latin_cyrillic_verified": true
+}

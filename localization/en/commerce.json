@@ -1,0 +1,76 @@
+{
+  "Action accepted": "Action accepted",
+  "Action accepted. The result will appear in your conversation.": "Action accepted. The result will appear in your conversation.",
+  "Action completed": "Action completed",
+  "Another tab already has a new request. Close and reopen this window to refresh its status.": "Another tab already has a new request. Close and reopen this window to refresh its status.",
+  "Awaiting payment": "Awaiting payment",
+  "Check again": "Check again",
+  "Check the previous request first.": "Check the previous request first.",
+  "Checkout expired": "Checkout expired",
+  "Completed": "Completed",
+  "Completing your purchase…": "Completing your purchase…",
+  "Confirm purchase": "Confirm purchase",
+  "Confirming the checkout status…": "Confirming the checkout status…",
+  "Continue": "Continue",
+  "Could not load this offer.": "Could not load this offer.",
+  "Could not prepare a new purchase.": "Could not prepare a new purchase.",
+  "Could not update the status. Checking again…": "Could not update the status. Checking again…",
+  "Could not use this benefit.": "Could not use this benefit.",
+  "Loading the offer…": "Loading the offer…",
+  "New purchase": "New purchase",
+  "No free benefit is available. Choose a payment method.": "No free benefit is available. Choose a payment method.",
+  "One moment…": "One moment…",
+  "Open checkout": "Open checkout",
+  "Payment method": "Payment method",
+  "Payment received": "Payment received",
+  "Photo unlocked": "Photo unlocked",
+  "Preparing checkout…": "Preparing checkout…",
+  "Price": "Price",
+  "product_types": {
+    "base": {
+      "title": "Base · {days} days",
+      "description": "Base benefits under the current subscription terms."
+    },
+    "full": {
+      "title": "Full · {days} days",
+      "description": "Base benefits and unlimited new videos in every chat. Delivered videos stay in your history."
+    },
+    "photo": {
+      "title": "Unlock photo",
+      "description": "Unlock the photo in this conversation."
+    },
+    "scene_unlock": {
+      "title": "Unlock scene",
+      "description": "Unlock access to the current scene."
+    },
+    "fast_scene_skip": {
+      "title": "Skip Fast scene",
+      "description": "Continue to the next Fast scene."
+    },
+    "video_unlock": {
+      "title": "Animate photo",
+      "description": "One video for the selected photo. The delivered video message stays in your history to watch again."
+    },
+    "video_pass": {
+      "title": "VideoPass",
+      "description": "Unlimited new videos in this chat’s current scene. Delivered videos stay in your history after the scene changes."
+    }
+  },
+  "Purchase": "Purchase",
+  "Purchase completed": "Purchase completed",
+  "Purchase created": "Purchase created",
+  "Purchase did not complete": "Purchase did not complete",
+  "Purchases are unavailable in this browser. Open the app in an up-to-date browser.": "Purchases are unavailable in this browser. Open the app in an up-to-date browser.",
+  "Start a new purchase": "Start a new purchase",
+  "The action is still in progress.": "The action is still in progress.",
+  "The current purchase is still in progress.": "The current purchase is still in progress.",
+  "The request could not be completed. A retry uses the same operation.": "The request could not be completed. A retry uses the same operation.",
+  "There is no available payment method for this offer yet.": "There is no available payment method for this offer yet.",
+  "This offer is currently unavailable.": "This offer is currently unavailable.",
+  "This payment needs support review.": "This payment needs support review.",
+  "Use an available benefit": "Use an available benefit",
+  "You can close this window. Your purchase status will be saved.": "You can close this window. Your purchase status will be saved.",
+  "You’re all set": "You’re all set",
+  "Your benefits have been updated.": "Your benefits have been updated.",
+  "Your unfinished request is saved. Checking again does not create a second purchase.": "Your unfinished request is saved. Checking again does not create a second purchase."
+}

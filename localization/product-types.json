@@ -1,0 +1,20 @@
+{
+  "ru": {
+    "base": {"title":"Base · {days} дней","description":"Возможности Base согласно действующим условиям подписки."},
+    "full": {"title":"Full · {days} дней","description":"Возможности Base и безлимитные новые видео во всех чатах. Уже полученные видео остаются в истории."},
+    "photo": {"title":"Открыть фотографию","description":"Открой фотографию в этом диалоге."},
+    "scene_unlock": {"title":"Разблокировать сцену","description":"Открой доступ к текущей сцене."},
+    "fast_scene_skip": {"title":"Пропустить сцену Fast","description":"Перейди к следующей сцене Fast."},
+    "video_unlock": {"title":"Оживить фото","description":"Одно видео для выбранной фотографии. Полученное видеосообщение остаётся в истории для повторного просмотра."},
+    "video_pass": {"title":"VideoPass","description":"Безлимитные новые видео в текущей сцене этого чата. Уже полученные видео остаются в истории после смены сцены."}
+  },
+  "en": {
+    "base": {"title":"Base · {days} days","description":"Base benefits under the current subscription terms."},
+    "full": {"title":"Full · {days} days","description":"Base benefits and unlimited new videos in every chat. Delivered videos stay in your history."},
+    "photo": {"title":"Unlock photo","description":"Unlock the photo in this conversation."},
+    "scene_unlock": {"title":"Unlock scene","description":"Unlock access to the current scene."},
+    "fast_scene_skip": {"title":"Skip Fast scene","description":"Continue to the next Fast scene."},
+    "video_unlock": {"title":"Animate photo","description":"One video for the selected photo. The delivered video message stays in your history to watch again."},
+    "video_pass": {"title":"VideoPass","description":"Unlimited new videos in this chat’s current scene. Delivered videos stay in your history after the scene changes."}
+  }
+}

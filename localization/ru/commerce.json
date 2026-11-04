@@ -1,0 +1,76 @@
+{
+  "Action accepted": "Действие принято",
+  "Action accepted. The result will appear in your conversation.": "Действие принято. Результат появится в диалоге.",
+  "Action completed": "Действие выполнено",
+  "Another tab already has a new request. Close and reopen this window to refresh its status.": "В другой вкладке уже есть новый запрос. Закрой и открой это окно, чтобы обновить статус.",
+  "Awaiting payment": "Ожидаем оплату",
+  "Check again": "Повторить проверку",
+  "Check the previous request first.": "Сначала нужно проверить предыдущий запрос.",
+  "Checkout expired": "Срок оплаты истёк",
+  "Completed": "Готово",
+  "Completing your purchase…": "Выполняем покупку…",
+  "Confirm purchase": "Подтвердить покупку",
+  "Confirming the checkout status…": "Уточняем статус оплаты…",
+  "Continue": "Продолжить",
+  "Could not load this offer.": "Не удалось загрузить предложение.",
+  "Could not prepare a new purchase.": "Не удалось подготовить новую покупку.",
+  "Could not update the status. Checking again…": "Не удалось обновить статус. Проверяем ещё раз…",
+  "Could not use this benefit.": "Не удалось использовать бонус.",
+  "Loading the offer…": "Загружаем условия…",
+  "New purchase": "Новая покупка",
+  "No free benefit is available. Choose a payment method.": "Бесплатного бонуса нет. Выбери способ оплаты.",
+  "One moment…": "Подождём…",
+  "Open checkout": "Перейти к оплате",
+  "Payment method": "Способ оплаты",
+  "Payment received": "Оплата получена",
+  "Photo unlocked": "Фотография открыта",
+  "Preparing checkout…": "Готовим оплату…",
+  "Price": "Стоимость",
+  "product_types": {
+    "base": {
+      "title": "Base · {days} дней",
+      "description": "Возможности Base согласно действующим условиям подписки."
+    },
+    "full": {
+      "title": "Full · {days} дней",
+      "description": "Возможности Base и безлимитные новые видео во всех чатах. Уже полученные видео остаются в истории."
+    },
+    "photo": {
+      "title": "Открыть фотографию",
+      "description": "Открой фотографию в этом диалоге."
+    },
+    "scene_unlock": {
+      "title": "Разблокировать сцену",
+      "description": "Открой доступ к текущей сцене."
+    },
+    "fast_scene_skip": {
+      "title": "Пропустить сцену Fast",
+      "description": "Перейди к следующей сцене Fast."
+    },
+    "video_unlock": {
+      "title": "Оживить фото",
+      "description": "Одно видео для выбранной фотографии. Полученное видеосообщение остаётся в истории для повторного просмотра."
+    },
+    "video_pass": {
+      "title": "VideoPass",
+      "description": "Безлимитные новые видео в текущей сцене этого чата. Уже полученные видео остаются в истории после смены сцены."
+    }
+  },
+  "Purchase": "Покупка",
+  "Purchase completed": "Покупка выполнена",
+  "Purchase created": "Покупка создана",
+  "Purchase did not complete": "Покупка не завершена",
+  "Purchases are unavailable in this browser. Open the app in an up-to-date browser.": "Покупки в этом браузере недоступны. Открой приложение в актуальном браузере.",
+  "Start a new purchase": "Попробовать новую покупку",
+  "The action is still in progress.": "Действие ещё выполняется.",
+  "The current purchase is still in progress.": "Текущая покупка ещё выполняется.",
+  "The request could not be completed. A retry uses the same operation.": "Не удалось завершить запрос. Повторная попытка использует ту же операцию.",
+  "There is no available payment method for this offer yet.": "Для этого предложения пока нет доступного способа оплаты.",
+  "This offer is currently unavailable.": "Это предложение сейчас недоступно.",
+  "This payment needs support review.": "Оплата требует проверки поддержки.",
+  "Use an available benefit": "Использовать доступный бонус",
+  "You can close this window. Your purchase status will be saved.": "Можно закрыть это окно. Статус покупки сохранится.",
+  "You’re all set": "Всё готово",
+  "Your benefits have been updated.": "Возможности обновлены.",
+  "Your unfinished request is saved. Checking again does not create a second purchase.": "Незавершённый запрос сохранён. Повторная проверка не создаёт вторую покупку."
+}
