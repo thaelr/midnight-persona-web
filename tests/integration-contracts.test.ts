@@ -16,7 +16,7 @@ test('new locale matching and missing-copy fallback do not restrict types to RU/
  assert.equal(translatePair('fr',{Save:'Enregistrer'},'Сохранить','Save'),'Enregistrer');assert.equal(translatePair('fr',{},'Сохранить','Save'),'Save');
 });
 test('reset mode, profile text, providerless feature and paid-video receipt use exact contracts',async()=>{
- const calls:Array<{url:string;body:unknown}>=[];const g=createGateway(async()=>'token',{baseUrl:'https://gateway.example.test',fetchImpl:async(url,init)=>{calls.push({url:String(url),body:init?.body?JSON.parse(String(init.body)):null});return Response.json({});}});
+ const calls:Array<{url:string;body:unknown}>=[];const g=createGateway(async()=>'token',{baseUrl:'https://gateway.example.test',fetchImpl:async(url,init)=>{calls.push({url:String(url),body:init?.body?JSON.parse(String(init.body)):null});return Response.json(String(url).endsWith('/web/me')?{user_id:'test-user',language:'en',age_confirmed_at:null,terms_accepted_at:null,needs_language_selection:false,entitlements:{}}:String(url).endsWith('/purchases')?{available:true,fulfilled:true}:{});}});
  await g.reset('c1234567',{client_message_id:'same',scene_mode:'roleplay'});await g.updateProfile({display_name:'Name',profile_text:'A note'});await g.createPurchase({client_message_id:'benefit',chat_code:'c1234567',sku:'server-feature'});await g.videoDelivery('receipt');
  assert.deepEqual(calls[0].body,{client_message_id:'same',scene_mode:'roleplay'});assert.deepEqual(calls[1].body,{display_name:'Name',profile_text:'A note'});assert.equal(Object.hasOwn(calls[2].body as object,'provider'),false);assert.match(calls[3].url,/video-deliveries\/receipt$/);
 });

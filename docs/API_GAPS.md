@@ -1,22 +1,25 @@
-# Статус контрактов на 3 ноября 2026 года
+# Контракты и внешние зависимости — 05.11.2026
 
-Этот файл заменяет исторический список отсутствующих endpoints ветки web от 28 октября. Источник истины для поставки — актуальный Gateway main 77b60cfdf01bbd4663c617ddda09a15584009060 и полные изменённые файлы в общем ZIP.
+Это текущий статус поставки v3.1. Исторические списки отсутствующих API от 28 октября и 3 ноября больше не описывают текущий код.
 
-Реализованы: локализованные персонажи и gallery_photos; динамические /web/localizations; profile_text; reset.scene_mode; history фото/видео с устойчивыми ID и client_message_id; бессрочный повторный доступ владельца к доставленному видео; Video Unlock/VideoPass/Full/upgrade; providerless бесплатные действия; EN NOWPayments и RU СБП; chat summaries/read; реальные publications; campaign voting; Telegram OIDC linking.
+| UI | Реальный контракт Gateway |
+| --- | --- |
+| Auth / профиль | bootstrap, me, PATCH me, age/terms, Google Auth; Telegram custom Supabase identity проверяется Gateway; legacy linking challenge остаётся серверной операцией |
+| Список чатов | GET chats: last_message, unread_count, last_read_message_id, origin; POST read |
+| Активный чат | messages: event_cursor + quick_replies; events: cursor + operations для operation_ids; gap 409 требует snapshot/rebase; повтор message/reset использует прежний client_message_id |
+| Фото | GET/POST media/:id/panel: position/count, server actions, anchor/current ID; закрытый offer открывается существующим unlock/payment |
+| Видео | gallery pending deliveries и history video_delivery_id; повтор GET delivery возвращает ссылку того же владельца без новой выдачи |
+| Покупки | Account catalog/entitlements; purchase.chat_code необязателен для subscription; product.requires_chat определяет необходимость контекста; receipt и server status подтверждают право |
+| Публикации / голосование | publications с пагинацией; voting campaign/candidates, server vote |
+| Локализация | public languages и namespace web/commerce; ошибки дают встроенный RU/EN, не блокируют вход |
 
-Сведения об endpoint/DTO/SQL/n8n связях находятся в docs/CONTRACT_MATRIX.md общего ZIP. Порядок новых миграций и словарей — в docs/INTEGRATION_NOTES.md.
+Полный snapshot: `contracts/openapi.web.json`; генерация TS: `scripts/generate-api.mjs`. Изменения SQL/n8n и security invariants описывает общий `INTEGRATION_REPORT.md`. Клиент не содержит собственной базы персонажей, медиавыбора, цен, балансов или правил entitlement.
 
-Внешние зависимости, которые frontend не подменяет:
+Оставшиеся материалы/внешние зависимости:
 
-- Реальный Gateway origin и разрешённый frontend CORS origin.
-- Supabase Auth URL, publishable key, Google/Anonymous/manual linking и callback allowlist.
-- Реальные Terms/Privacy, контакты и FAQ.
-- Настройки Telegram Login client/origin; SDK загружается с официального oauth.telegram.org только при открытии привязки.
-- Серверная конфигурация SKU/цен/провайдеров и реальная подтверждённая IPN интеграция.
-- Готовые video_catalog/MP4 и доступ Gateway к приватному Storage.
-- Административные публикации и активная campaign/candidates. Отсутствие этих данных является штатным пустым состоянием.
+- Утверждённые RU/EN Terms и Privacy: четыре поля `src/legal/content.ts`, заполняет владелец.
+- Реальный Supabase Telegram custom OIDC provider, email-optional/profile scope и проверяемый allowlisted Telegram `id`; opaque OIDC `sub` не является Telegram bot user ID. Google/Guest/linking и redirect origins должны существовать в Auth.
+- Платёжные кабинеты и реальные IPN, приватный Storage/video catalogue, CORS/origins — не проверялись и не изменялись в production.
+- Публикации и голосования показывают реальные серверные данные; пустое состояние штатно.
 
-Скрытые Writer/Memory/Build Dynamic Instructions workflow не реконструировались. Полный E2E с реальной генерацией, внешним OAuth/Telegram/payment и физической мобильной клавиатурой остаётся проверкой владельца. Успешная локальная сборка не доказывает эти сценарии.
-
-Фотопанели: GET/POST /web/chats/:chat_code/media/:media_id/panel используют существующие Media Commerce photo_prev/photo_next/photo_regen. Только сервер выбирает и оценивает новое фото; frontend сохраняет anchor/current ID и идемпотентность, а locked offer открывается через прежний unlock/payment. Lightbox листает только уже полученные авторизованные фото, без запросов новых медиа.
-
+Проверки разделены: unit/контролируемые browser fixtures; локальные реальные Gateway/Postgres и n8n/Core/Writer с нейтральной моделью; непроверенные реальные OAuth, внешние оплаты/IPN, production-медиа, physical mobile keyboard и длительная работа мобильной ОС в фоне. Зелёная локальная сборка не равна production-проверке.

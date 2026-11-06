@@ -6,3 +6,5 @@ dist/
 *.tar.gz
 *.log
 qa/
+test-results/
+playwright-report/

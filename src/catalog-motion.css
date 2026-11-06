@@ -1,0 +1,25 @@
+/* Catalogue geometry overrides only; brand colours and type remain shared tokens. */
+.catalog-motion-root{height:100%;min-height:0;position:relative}
+.catalog-motion-root>section{position:absolute;inset:0}
+.characters-view .catalog-stage.carousel{touch-action:pan-y;isolation:isolate}
+.characters-view .catalog-stage .catalog-slot{position:relative;min-width:0}
+.characters-view .catalog-stage.carousel .catalog-slot{position:absolute;inset:0;width:28%;height:calc(100% - 80px);max-height:550px;margin:auto;pointer-events:none}
+.catalog-card-motion{position:relative;width:100%;height:100%;transform-origin:center;transform-style:preserve-3d}
+.characters-view .carousel .catalog-card-motion{pointer-events:auto;touch-action:pan-y}
+.characters-view .catalog-stage .swipe-card,.characters-view .catalog-stage .grid-card{width:100%;height:100%;transform:none;touch-action:pan-y}
+.characters-view .catalog-stage.character-grid .catalog-slot{aspect-ratio:3/4}
+.characters-view .catalog-stage.character-grid .catalog-slot:last-child{grid-column:1/-1;aspect-ratio:auto}
+.characters-view .catalog-stage.character-grid .catalog-slot:last-child .vote-banner{width:100%;margin:0}
+.characters-view .catalog-stage.character-grid .catalog-card-motion{transform:none!important;opacity:1!important}
+.characters-view .catalog-stage .catalog-selected{z-index:4}
+.catalog-detail-photo{position:absolute;inset:0;border-radius:inherit}
+.catalog-detail .character-gallery-photo{transform:none;touch-action:pan-y}
+.catalog-detail .back-to-choice{will-change:auto}
+@media(max-width:900px){.characters-view .catalog-stage.carousel .catalog-slot{width:34%}}
+@media(max-width:600px){
+ .characters-view .catalog-stage.carousel .catalog-slot{width:74%;height:calc(100% - 65px);max-height:560px}
+ .characters-view .catalog-stage.character-grid .catalog-slot{aspect-ratio:1}
+ .catalog-detail .character-gallery{touch-action:pan-y}
+}
+@media(max-height:700px) and (max-width:600px){.characters-view .catalog-stage.carousel .catalog-slot{height:calc(100% - 30px)}}
+@media(prefers-reduced-motion:reduce){.catalog-card-motion{transform-style:flat}}

@@ -1,13 +1,39 @@
+import {useRef,useState,type ReactNode,type SyntheticEvent} from 'react';
+import {Drawer} from '@base-ui/react/drawer';
 import {useCopy} from '../lib/localization';
 import {useOverlayBack} from '../lib/overlayBack';
-import {useEffect,useRef,useId,type ReactNode} from 'react';
-import {motion,useReducedMotion} from 'motion/react';
 import {Icon} from './Icons';
+import './sheet.css';
+
+// Apply the library's exclusion before it considers a touch/pen gesture. This also
+// covers controls rendered later by purchase/profile content without changing it.
+function ignoreControlSwipe(event:SyntheticEvent<HTMLDivElement>){
+ const target=event.target instanceof Element?event.target:null;
+ const control=target?.closest('button,a,input,textarea,select,label,[role="button"],[contenteditable="true"]');
+ if(control&&event.currentTarget.contains(control)&&!control.hasAttribute('data-base-ui-swipe-ignore'))control.setAttribute('data-base-ui-swipe-ignore','');
+}
+
 export function Sheet({title,onClose,children}:{title:string;onClose:()=>void;children:ReactNode}){
  const t=useCopy();
- useOverlayBack(true,onClose);
- const ref=useRef<HTMLDivElement>(null),id=useId(),reduce=useReducedMotion();
- const close=useRef(onClose);close.current=onClose;
- useEffect(()=>{const previous=document.activeElement as HTMLElement|null;const node=ref.current;node?.focus();const handler=(e:KeyboardEvent)=>{if(e.key==='Escape'){e.preventDefault();close.current();}if(e.key==='Tab'){const list=node?.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not(:disabled),textarea:not(:disabled),select:not(:disabled),[tabindex="0"]');if(!list?.length){e.preventDefault();return;}const first=list[0],last=list[list.length-1];if(e.shiftKey&&(document.activeElement===first||document.activeElement===node)){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}};document.addEventListener('keydown',handler);const old=document.body.style.overflow;document.body.style.overflow='hidden';return()=>{document.removeEventListener('keydown',handler);document.body.style.overflow=old;previous?.focus();};},[]);
- return <div className="sheet-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}><motion.div ref={ref} role="dialog" aria-modal="true" aria-labelledby={id} tabIndex={-1} className="sheet" initial={{y:reduce?0:80,opacity:0}} animate={{y:0,opacity:1}} exit={{y:reduce?0:80,opacity:0}} transition={{duration:reduce?0:.32,ease:[.22,1,.36,1]}}><div className="sheet-grip"/><header><h2 id={id}>{title}</h2><button className="icon-button" onClick={onClose} aria-label={t('Закрыть','Close')}><Icon name="close"/></button></header><div className="sheet-content">{children}</div></motion.div></div>;
+ const [open,setOpen]=useState(true);
+ const closing=useRef(false),closed=useRef(false),close=useRef(onClose);
+ close.current=onClose;
+ const requestClose=()=>{if(!closing.current){closing.current=true;setOpen(false);}};
+ // History remains owned by this hook through the exit. Base UI owns focus,
+ // scroll locking and gesture arbitration, and never writes our history entry.
+ useOverlayBack(true,requestClose);
+ return <Drawer.Root open={open} swipeDirection="down" onOpenChange={next=>{if(!next)requestClose();}} onOpenChangeComplete={next=>{
+   if(!next&&!closed.current){closed.current=true;close.current();}
+  }}>
+  <Drawer.VirtualKeyboardProvider><Drawer.Portal>
+   <Drawer.Backdrop className="drawer-sheet-backdrop"/>
+   <Drawer.Viewport className="drawer-sheet-viewport">
+    <Drawer.Popup className="sheet drawer-sheet" onPointerDownCapture={ignoreControlSwipe} onTouchStartCapture={ignoreControlSwipe}>
+     <div className="sheet-grip" aria-hidden="true"/>
+     <header><Drawer.Title render={<h2/>}>{title}</Drawer.Title><Drawer.Close className="icon-button" aria-label={t('Закрыть','Close')} data-base-ui-swipe-ignore><Icon name="close"/></Drawer.Close></header>
+     <Drawer.Content className="sheet-content" data-base-ui-swipe-ignore="x">{children}</Drawer.Content>
+    </Drawer.Popup>
+   </Drawer.Viewport>
+  </Drawer.Portal></Drawer.VirtualKeyboardProvider>
+ </Drawer.Root>;
 }

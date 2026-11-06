@@ -1,3 +1,9 @@
+import {CopyIcon} from './components/Icons';
+import {useServerQuery,queryClient,serverKey,ServerContext} from './lib/queries';
+import {setActivity} from './lib/activity';
+import {reportError} from './lib/diagnostics';
+import {startPolling} from './lib/polling';
+import {useContext} from 'react';
 import {useCopy,useLocalization} from './lib/localization';
 import {TelegramLink} from './Community';
 import {ApiError} from './lib/gateway';
@@ -10,20 +16,9 @@ import { Sheet } from './components/Sheet';
 import './account.css';
 
 type Language = string;
-export type PurchaseRequest = { sku: string; chatCode: string; mediaId?: string; subscriptionChange?: 'upgrade'|'renew';animateMediaId?:string };
+export type PurchaseRequest = { sku: string; chatCode?: string; mediaId?: string; subscriptionChange?: 'upgrade'|'renew';animateMediaId?:string };
 type Notify = (message: string) => void;
 
-function CopyIcon({ kind }: { kind: 'person' | 'spark' | 'link' | 'globe' | 'help' | 'gift' }) {
-  const paths = {
-    person: <><path d="M8 8a4 4 0 1 0 8 0 4 4 0 1 0-8 0"/><path d="M4 21c0-8 16-8 16 0"/></>,
-    spark: <path d="m12 2 2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4Z"/>,
-    link: <><path d="m10 7 3-3c5-5 11 1 6 6l-3 3M14 17l-3 3c-5 5-11-1-6-6l3-3M8 16l8-8"/></>,
-    globe: <><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c-6 6-6 12 0 18 6-6 6-12 0-18"/></>,
-    help: <><path d="M8 8c0-5 9-5 9 0 0 4-5 3-5 7M12 19h.01"/><circle cx="12" cy="12" r="10"/></>,
-    gift: <><path d="M4 10h16v11H4ZM3 6h18v4H3ZM12 6v15"/><path d="M12 6C1 6 8-4 12 6c4-10 11 0 0 0"/></>,
-  };
-  return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">{paths[kind]}</svg>;
-}
 
 function Row({ title, subtitle, icon, onClick, trailing }: { title: string; subtitle?: string; icon: Parameters<typeof CopyIcon>[0]['kind']; onClick: () => void; trailing?: string }) {
   return <button type="button" className="account-row" onClick={onClick}>
@@ -39,16 +34,17 @@ function safeUrl(value: string | undefined, protocols: string[] = ['https:']) {
 function message(_error: unknown, fallback: string) { return fallback; }
 function priceText(price: Product['price']) { return price ? `${price.amount} ${price.currency}` : '—'; }
 
-export function ProfileView({ gateway, profile, onProfile, onPurchase, notify, onLinkGoogle, language, chats, onLinked }: {
+export function ProfileView({ gateway, profile, onProfile, onPurchase, notify, onLinkGoogle, language, chats, onLinked,onLogout }: {
   gateway: Gateway;
   profile: Profile;
   onProfile: (profile: Profile) => void;
-  onPurchase: (sku: string, chatCode: string, mediaId?: string, subscriptionChange?:'upgrade'|'renew',animateMediaId?:string) => void;
+  onPurchase: (sku: string, chatCode?: string, mediaId?: string, subscriptionChange?:'upgrade'|'renew',animateMediaId?:string) => void;
   notify: Notify;
   onLinkGoogle: () => void;
   language: Language;
   chats: Chat[];
   onLinked:()=>void;
+  onLogout:()=>void;
 }) {
   const en = language === 'en';
   const t=useCopy();const {languages}=useLocalization();
@@ -56,20 +52,15 @@ export function ProfileView({ gateway, profile, onProfile, onPurchase, notify, o
   const [name, setName] = useState(profile.display_name ?? '');
   const [note,setNote]=useState(profile.profile_text??'');
   const [busy, setBusy] = useState(false);
-  const [catalog, setCatalog] = useState<Catalog | null>(null);
-  const [rights, setRights] = useState<Entitlements | null>(null);
-  const [error, setError] = useState('');
+  const catalogQuery=useServerQuery('catalog',signal=>gateway.catalog(undefined,signal),{context:'account'});
+  const rightsQuery=useServerQuery('entitlements',signal=>gateway.entitlements(signal),{staleTime:15_000});
+  const catalog=catalogQuery.data;const rights=rightsQuery.isError?undefined:rightsQuery.data;
+  const error=catalogQuery.isError?t('Не удалось загрузить возможности','Could not load your benefits'):'';
   const [selectedChat, setSelectedChat] = useState(chats[0]?.chat_code ?? '');
 
   useEffect(() => { setName(profile.display_name ?? '');setNote(profile.profile_text??''); }, [profile.display_name,profile.profile_text]);
   useEffect(() => { if (!selectedChat && chats[0]) setSelectedChat(chats[0].chat_code); }, [chats, selectedChat]);
-  useEffect(() => {
-    let live = true;
-    Promise.all([gateway.catalog(selectedChat || undefined), gateway.entitlements()]).then(([nextCatalog, nextRights]) => {
-      if (live) { setCatalog(nextCatalog); setRights(nextRights); setError(''); }
-    }).catch(error => { if (live) setError(message(error, t('Не удалось загрузить возможности', 'Could not load your benefits'))); });
-    return () => { live = false; };
-  }, [gateway, selectedChat, profile]);
+  useEffect(()=>{setActivity('profile-draft',name!==(profile.display_name??'')||note!==(profile.profile_text??''));return()=>setActivity('profile-draft',false);},[name,note,profile.display_name,profile.profile_text]);
 
   const toggle = (next: string) => setSection(old => old === next ? null : next);
   const patch = async (data: { display_name?: string; language?: Language; profile_text?:string }) => {
@@ -110,11 +101,9 @@ export function ProfileView({ gateway, profile, onProfile, onPurchase, notify, o
       {section === 'subscription' && <section className="account-expand" aria-label={t('Подписка', 'Subscription')}>
         {until && <p className="account-hint">{t('Срок действия: ', 'Valid until: ')}{until}</p>}
         {currentPlan?.description && <p>{currentPlan.description}</p>}
-        {chats.length > 1 && <label>{t('Выбери диалог для доступных предложений', 'Choose a conversation for available offers')}<select value={selectedChat} onChange={event => setSelectedChat(event.target.value)}>{chats.map((chat, index) => <option key={chat.chat_code} value={chat.chat_code}>{t('Диалог', 'Conversation')} {index + 1}</option>)}</select></label>}
-        {!chats.length && <p className="account-hint">{t('Сначала начни диалог с персонажем. Доступные предложения появятся здесь.', 'Start a conversation with a character to see your available offers.')}</p>}
         {error && <p className="account-error" role="alert">{error}</p>}
         {!catalog && !error && <p className="account-hint" role="status">{t('Загружаем предложения…', 'Loading offers…')}</p>}
-        {catalog?.products.filter(item => item.kind === 'subscription').map(item => <button type="button" className="account-offer" key={item.sku} onClick={() => onPurchase(item.sku, selectedChat,undefined,item.upgrade?'upgrade':undefined)} disabled={!selectedChat || catalog.pricing_requires_chat || !item.providers.length || !item.price}>
+        {catalog?.products.filter(item => item.kind === 'subscription').map(item => <button type="button" className="account-offer" key={item.sku} onClick={() => onPurchase(item.sku, undefined,undefined,item.upgrade?'upgrade':undefined)} disabled={Boolean(item.requires_chat) || !item.providers.length || !item.price}>
           <span><strong>{item.title}</strong><small>{item.description}</small></span><span>{priceText(item.upgrade?.price??item.price)} ↗</span>
         </button>)}
         {catalog && !catalog.products.some(item => item.kind === 'subscription') && <p className="account-hint">{t('Сейчас нет доступных предложений подписки.', 'There are no subscription offers available right now.')}</p>}
@@ -134,7 +123,7 @@ export function ProfileView({ gateway, profile, onProfile, onPurchase, notify, o
       <Row title={t('Язык', 'Language')} trailing={languages.find(l=>l.locale===language)?.display_name??language} icon="globe" onClick={() => toggle('language')}/>
       <Row title={t('Поддержка', 'Support')} icon="help" onClick={() => toggle('support')}/>
     </div>
-    <footer className="account-footer">MIDNIGHT PERSONA <span>{t('ПОСЛЕ ПОЛУНОЧИ. ТВОИ ПРАВИЛА.','AFTER HOURS, YOUR RULES.')}</span></footer>
+    <div className="account-support"><a href="/terms">{t("Условия сервиса","Terms of service")}</a><a href="/privacy">{t("Конфиденциальность","Privacy policy")}</a><button onClick={onLogout}>{t("Выйти","Sign out")}</button></div><footer className="account-footer">MIDNIGHT PERSONA <span>{t('ПОСЛЕ ПОЛУНОЧИ. ТВОИ ПРАВИЛА.','AFTER HOURS, YOUR RULES.')}</span></footer>
     {section === 'language' && <Sheet title={t('Язык', 'Language')} onClose={() => setSection(null)}>
       <div className="account-language" role="group" aria-label={t('Язык интерфейса', 'Interface language')}>
         {languages.map(({locale:value,display_name}) => <button type="button" key={value} className={language === value ? 'selected' : ''} disabled={busy} onClick={() => void patch({ language: value })}><span>{display_name}</span><span aria-hidden="true">{language === value ? '✓' : '○'}</span></button>)}
@@ -178,6 +167,7 @@ export function PurchaseSheet(props: {
 function PurchaseContent({ gateway, request, onClose, notify, onComplete, language = 'ru' }: {
   gateway: Gateway; request: PurchaseRequest; onClose: () => void; notify: Notify; onComplete: () => void; language?: Language;
 }) {
+  const scope=useContext(ServerContext);
   const en = language === 'en';
   const t=useCopy('commerce');
   const [product, setProduct] = useState<Product | null>(null);
@@ -193,25 +183,26 @@ function PurchaseContent({ gateway, request, onClose, notify, onComplete, langua
   const announced = useRef(false);
   const submitting = useRef(false);
   const callbacks = useRef({ notify, onComplete });
-  const hasPurchaseLock = typeof navigator !== 'undefined' && !!navigator.locks;
+  const withPurchaseLock=async(task:()=>Promise<void>)=>{if(navigator.locks)return navigator.locks.request('mp-commerce:'+storageKey,task);reportError('commerce','capability',{code:'web_locks_unavailable'});await new Promise(r=>setTimeout(r,0));return task();};
+  const readPurchase=(id:string)=>queryClient.fetchQuery({queryKey:serverKey(scope.owner,'','receipt',id),queryFn:()=>gateway.purchase(id),staleTime:3000});
   callbacks.current = { notify, onComplete };
 
   useEffect(() => {
     let live = true;
     const load = async () => {
       try {
-        const [catalog, me] = await Promise.all([gateway.catalog(request.chatCode), gateway.me()]);
+        const catalog=await queryClient.fetchQuery({queryKey:serverKey(scope.owner,language,'catalog',request.chatCode??'account'),queryFn:({signal})=>gateway.catalog(request.chatCode,signal),staleTime:0});const me={user_id:scope.owner};
         if (!live) return;
         const item = catalog.products.find(item => item.sku === request.sku);
-        if (!item || catalog.pricing_requires_chat) throw new Error(t('Это предложение сейчас недоступно.', 'This offer is currently unavailable.'));
+        if (!item || (item.requires_chat&&!request.chatCode)) throw new Error(t('Это предложение сейчас недоступно.', 'This offer is currently unavailable.'));
         setProduct(item);
-        const key = `mp:purchase:${encodeURIComponent(config.apiBaseUrl)}:${me.user_id}:${request.chatCode}:${request.sku}:${request.mediaId ?? ''}:${request.subscriptionChange??'renew'}`;
+        const key = `mp:purchase:${encodeURIComponent(config.apiBaseUrl)}:${me.user_id}:${request.chatCode??'account'}:${request.sku}:${request.mediaId ?? ''}:${request.subscriptionChange??'renew'}`;
         setStorageKey(key);
         const saved = readAttempt(key);
         setAttempt(saved);
         setProvider(saved?.provider ?? item.providers[0] ?? '');
         if (saved?.purchaseId) {
-          const existing = await gateway.purchase(saved.purchaseId);
+          const existing = await readPurchase(saved.purchaseId);
           if (live) setPurchase(existing);
         } else if (saved?.finished && live) setFinished(true);
         else if (saved?.pendingFeature && live) setFreeOperationPending(true);
@@ -233,36 +224,21 @@ function PurchaseContent({ gateway, request, onClose, notify, onComplete, langua
       return;
     }
     if (purchase.status === 'failed' || purchase.status === 'expired') return;
-    let live = true;
-    let timer: ReturnType<typeof setTimeout>;
-    const poll = async () => {
-      try {
-        const updated = await gateway.purchase(purchase.purchase_id);
-        if (live) { setPurchase(updated); setError(''); }
-      } catch (error) { if (live) setError(message(error, t('Не удалось обновить статус. Проверяем ещё раз…', 'Could not update the status. Checking again…'))); }
-      finally { if (live) timer = setTimeout(poll, 4000); }
-    };
-    timer = setTimeout(poll, 3000);
-    return () => { live = false; clearTimeout(timer); };
+    let live=true;const stop=startPolling(async()=>{const updated=await readPurchase(purchase.purchase_id);if(live){setPurchase(updated);setError('');}return true;},error=>{if(live)setError(message(error,t('Не удалось обновить статус. Проверяем ещё раз…','Could not update the status. Checking again…')));});return()=>{live=false;stop();};
   }, [gateway, purchase?.purchase_id, purchase?.status, storageKey, attempt?.clientMessageId]);
 
-  const submitFree = async () => {if(submitting.current||!storageKey||!product)return;setBusy(true);try{const key=storageKey+':redeem';let id=localStorage.getItem(key);if(!id){id=crypto.randomUUID();localStorage.setItem(key,id);}const result=await gateway.createPurchase({client_message_id:id,chat_code:request.chatCode,sku:request.sku,...(request.mediaId?{media_id:request.mediaId}:{})});if('available'in result&&result.available){setFinished(result.fulfilled);setFreeOperationPending(!result.fulfilled);callbacks.current.onComplete();callbacks.current.notify(t('Действие принято','Action accepted'));}}catch(e){setError(e instanceof ApiError&&e.status===402?t('Бесплатного бонуса нет. Выбери способ оплаты.','No free benefit is available. Choose a payment method.'):t('Не удалось использовать бонус.','Could not use this benefit.'));}finally{setBusy(false);}};
+  const submitFree = async () => {if(submitting.current||!storageKey||!product)return;submitting.current=true;setBusy(true);try{const key=storageKey+':redeem';let id=localStorage.getItem(key);if(!id){id=crypto.randomUUID();localStorage.setItem(key,id);}const result=await gateway.createPurchase({client_message_id:id,...(request.chatCode?{chat_code:request.chatCode}:{}),sku:request.sku,...(request.mediaId?{media_id:request.mediaId}:{})});if('available'in result&&result.available){setFinished(result.fulfilled);setFreeOperationPending(!result.fulfilled);callbacks.current.onComplete();callbacks.current.notify(t('Действие принято','Action accepted'));}}catch(e){setError(e instanceof ApiError&&e.status===402?t('Бесплатного бонуса нет. Выбери способ оплаты.','No free benefit is available. Choose a payment method.'):t('Не удалось использовать бонус.','Could not use this benefit.'));}finally{submitting.current=false;setBusy(false);}};
   const submit = async () => {
     if (submitting.current || !product || !storageKey || purchase || finished) return;
     submitting.current = true;
     setBusy(true); setError('');
     try {
-      if (!hasPurchaseLock) {
-        if (attempt?.purchaseId) setPurchase(await gateway.purchase(attempt.purchaseId));
-        else setError(t('Покупки в этом браузере недоступны. Открой приложение в актуальном браузере.', 'Purchases are unavailable in this browser. Open the app in an up-to-date browser.'));
-        return;
-      }
-      await navigator.locks.request(`mp-commerce:${storageKey}`, async () => {
+      await withPurchaseLock(async () => {
         // A second tab can have submitted since this sheet was opened. Re-read while
         // holding the shared lock; never generate another ID for a live attempt.
         let current = readAttempt(storageKey);
         if (current) { setAttempt(current); setProvider(current.provider); }
-        if (current?.purchaseId) { setPurchase(await gateway.purchase(current.purchaseId)); return; }
+        if (current?.purchaseId) { setPurchase(await readPurchase(current.purchaseId)); return; }
         if (current?.finished) { setFinished(true); return; }
         if (current?.pendingFeature) { setFreeOperationPending(true); return; }
         if (!current) {
@@ -272,7 +248,7 @@ function PurchaseContent({ gateway, request, onClose, notify, onComplete, langua
         }
         const result = await gateway.createPurchase({
           client_message_id: current.clientMessageId,
-          chat_code: request.chatCode,
+          ...(request.chatCode?{chat_code:request.chatCode}:{}),
           sku: request.sku,
           ...(current.provider?{provider:current.provider}:{}),
           ...(request.subscriptionChange?{subscription_change:request.subscriptionChange}:{}),
@@ -312,19 +288,19 @@ function PurchaseContent({ gateway, request, onClose, notify, onComplete, langua
   const checkout = safeUrl(purchase?.checkout_url ?? undefined);
   const actionableCheckout = purchase && ['created', 'pending'].includes(purchase.status) && checkout;
   const startNewAttempt = async () => {
-    if (!hasPurchaseLock || submitting.current) return;
+    if (submitting.current) return;
     submitting.current = true; setBusy(true);
     try {
-      await navigator.locks.request(`mp-commerce:${storageKey}`, async () => {
+      await withPurchaseLock(async () => {
         const latest = readAttempt(storageKey);
         if (latest && latest.clientMessageId !== attempt?.clientMessageId) {
           setAttempt(latest);
-          if (latest.purchaseId) setPurchase(await gateway.purchase(latest.purchaseId));
+          if (latest.purchaseId) setPurchase(await readPurchase(latest.purchaseId));
           throw new Error(t('В другой вкладке уже есть новый запрос. Закрой и открой это окно, чтобы обновить статус.', 'Another tab already has a new request. Close and reopen this window to refresh its status.'));
         }
         if (latest?.pendingFeature) throw new Error(t('Действие ещё выполняется.', 'The action is still in progress.'));
         if (latest?.purchaseId) {
-          const existing = await gateway.purchase(latest.purchaseId);
+          const existing = await readPurchase(latest.purchaseId);
           if (!['fulfilled', 'failed', 'expired'].includes(existing.status)) {
             setPurchase(existing);
             throw new Error(t('Текущая покупка ещё выполняется.', 'The current purchase is still in progress.'));
@@ -339,20 +315,20 @@ function PurchaseContent({ gateway, request, onClose, notify, onComplete, langua
   };
   let body: ReactNode;
   if (loading) body = <p role="status" className="account-hint">{t('Загружаем условия…', 'Loading the offer…')}</p>;
-  else if (finished) body = <div className="account-purchase-result"><span aria-hidden="true">✓</span><h3>{t('Всё готово', 'You’re all set')}</h3><p>{t('Возможности обновлены.', 'Your benefits have been updated.')}</p><button type="button" className="account-primary" onClick={onClose}>{t('Продолжить', 'Continue')}</button>{product?.kind !== 'photo' && <button type="button" disabled={!hasPurchaseLock || busy} className="account-secondary" onClick={() => void startNewAttempt()}>{t('Новая покупка', 'New purchase')}</button>}</div>;
+  else if (finished) body = <div className="account-purchase-result"><span aria-hidden="true">✓</span><h3>{t('Всё готово', 'You’re all set')}</h3><p>{t('Возможности обновлены.', 'Your benefits have been updated.')}</p><button type="button" className="account-primary" onClick={onClose}>{t('Продолжить', 'Continue')}</button>{product?.kind !== 'photo' && <button type="button" disabled={busy} className="account-secondary" onClick={() => void startNewAttempt()}>{t('Новая покупка', 'New purchase')}</button>}</div>;
   else body = <>
     {product && <><p className="account-purchase-description">{product.description}</p><div className="account-purchase-price"><span>{t('Стоимость', 'Price')}</span><strong>{priceText(purchase?.price ?? (request.subscriptionChange==='upgrade'?product.upgrade?.price??product.price:product.price))}</strong></div></>}
     {purchase ? <>
       <p className="account-status" role="status"><span aria-hidden="true">◉</span>{status[purchase.status]}</p>
       {actionableCheckout && <a className="account-primary account-pay-link" href={checkout} target="_blank" rel="noopener noreferrer">{t('Перейти к оплате', 'Open checkout')} ↗</a>}
-      {['failed', 'expired'].includes(purchase.status) && <button type="button" disabled={!hasPurchaseLock || busy} className="account-secondary" onClick={() => void startNewAttempt()}>{t('Попробовать новую покупку', 'Start a new purchase')}</button>}
+      {['failed', 'expired'].includes(purchase.status) && <button type="button" disabled={busy} className="account-secondary" onClick={() => void startNewAttempt()}>{t('Попробовать новую покупку', 'Start a new purchase')}</button>}
       {!['failed', 'expired'].includes(purchase.status) && <p className="account-hint">{t('Можно закрыть это окно. Статус покупки сохранится.', 'You can close this window. Your purchase status will be saved.')}</p>}
     </> : freeOperationPending ? <p className="account-status" role="status">{t('Действие принято. Результат появится в диалоге.', 'Action accepted. The result will appear in your conversation.')}</p> : product && <>
       {!attempt&&['scene_unlock','fast_scene_skip'].includes(product.feature_key??'')&&<button type="button" className="account-secondary" disabled={busy} onClick={()=>void submitFree()}>{t('Использовать доступный бонус','Use an available benefit')}</button>}{product.providers.length > 0 && <label className="account-provider">{t('Способ оплаты', 'Payment method')}<select value={provider} disabled={!!attempt || busy} onChange={event => setProvider(event.target.value)}>{product.providers.map(value => <option key={value} value={value}>{value === 'nowpayments' ? 'NOWPayments' : value}</option>)}</select></label>}
       {!product.providers.length && <p className="account-hint">{t('Для этого предложения пока нет доступного способа оплаты.', 'There is no available payment method for this offer yet.')}</p>}
-      {!hasPurchaseLock && !attempt?.purchaseId && <p className="account-hint">{t('Покупки в этом браузере недоступны. Открой приложение в актуальном браузере.', 'Purchases are unavailable in this browser. Open the app in an up-to-date browser.')}</p>}
+
       {attempt && <p className="account-hint">{t('Незавершённый запрос сохранён. Повторная проверка не создаёт вторую покупку.', 'Your unfinished request is saved. Checking again does not create a second purchase.')}</p>}
-      <button type="button" className="account-primary" disabled={busy || (!attempt?.purchaseId && (!hasPurchaseLock || (product.kind==='subscription'&&(!provider||!product.price))))} onClick={() => void submit()}>{busy ? t('Подождём…', 'One moment…') : attempt ? t('Повторить проверку', 'Check again') : t('Подтвердить покупку', 'Confirm purchase')}</button>
+      <button type="button" className="account-primary" disabled={busy || (!attempt?.purchaseId && ((product.kind==='subscription'&&(!provider||!product.price))))} onClick={() => void submit()}>{busy ? t('Подождём…', 'One moment…') : attempt ? t('Повторить проверку', 'Check again') : t('Подтвердить покупку', 'Confirm purchase')}</button>
     </>}
   </>;
   return <Sheet title={product?.title ?? t('Покупка', 'Purchase')} onClose={onClose}><div className="account-purchase">{body}{error && <p className="account-error" role="alert">{error}</p>}</div></Sheet>;

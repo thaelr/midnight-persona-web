@@ -1,7 +1,14 @@
+import {ApiError} from './lib/gateway';
+import {startPolling} from './lib/polling';
+import {reportError} from './lib/diagnostics';
+import {setActivity} from './lib/activity';
+import {queryClient,serverKey,ServerContext} from './lib/queries';
+import {useContext} from 'react';
 import {useCopy} from './lib/localization';
 import {useOverlayBack} from './lib/overlayBack';
 import {authorizedPhotos} from './lib/photoViewer';
 import {PhotoPanelCard} from './PhotoPanelCard';
+import {PhotoLightbox, type PhotoLightboxSource} from './PhotoLightbox';
 import {ChatVideo} from './ChatVideo';
 import {SystemFeed} from './Community';
 import {Sheet} from './components/Sheet';
@@ -33,14 +40,15 @@ type ThreadState = {
   messages: Message[]; nextBefore: string | null; loaded: boolean; loading: boolean; error: string | null;
   cursor: string; replayed: boolean; quick: QuickRepliesData | null; media: TimelineMedia[];
   gallery: Gallery['media']; operations: Record<string, { status: string; action: string }>;
-  outgoing: Outgoing[]; unread: number;
+  outgoing: Outgoing[]; unread: number;windowed:boolean;
 };
 const fresh = (): ThreadState => ({ messages: [], nextBefore: null, loaded: false, loading: false, error: null,
-  cursor: '0', replayed: false, quick: null, media: [], gallery: [], operations: {}, outgoing: [], unread: 0 });
+  cursor: '0', replayed: false, quick: null, media: [], gallery: [], operations: {}, outgoing: [], unread: 0,windowed:false });
 const terminal = new Set(['completed', 'failed', 'stale']);
 const order = (a: Message, b: Message) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id);
 const mergeMessages = (left: Message[], right: Message[]) => [...new Map([...left, ...right].map(m => [m.id, m])).values()].sort(order);
 const readStorage = <T,>(key: string, fallback: T): T => { try { return JSON.parse(sessionStorage.getItem(key) || 'null') ?? fallback; } catch { return fallback; } };
+const readPersistent=(key:string)=>{try{return localStorage.getItem(key);}catch{return null;}};
 const writeStorage = (key: string, value: unknown) => { try { sessionStorage.setItem(key, JSON.stringify(value)); } catch { /* Private mode may disallow storage. */ } };
 const safeImage = (url: string | null | undefined) => { if (!url) return undefined; try { const u = new URL(url, location.origin); return ['https:', 'http:'].includes(u.protocol) ? u.href : undefined; } catch { return undefined; } };
 
@@ -61,11 +69,15 @@ function reconcileOutgoing(outgoing: Outgoing[], messages: Message[]): Outgoing[
 
 export function ChatView(props: ChatViewProps) {
   const { gateway, characters, chats, chatCode, onOpenChat, onClose, notify, onPurchase, onRefreshChats, language = 'ru', storageScope } = props;
+  const scope=useContext(ServerContext);
+  const alive=useRef(true),readAbort=useRef(new AbortController());
+  useEffect(()=>{alive.current=true;return()=>{alive.current=false;readAbort.current.abort();};},[]);
   const storagePrefix = storageScope ? `mp.chat.${encodeURIComponent(storageScope)}` : null;
   const tr = useCopy();const isSystem=chatCode==='system';
   const [videoOffers,setVideoOffers]=useState<{mediaId:string;products:Product[]}|null>(null);
   const [videoBusy,setVideoBusy]=useState<string|null>(null);
   const [continuing,setContinuing]=useState(false);
+  const [modeNotice,setModeNotice]=useState<string|null>(null);const [reconnect,setReconnect]=useState(0);
   const [threads, setThreads] = useState<Record<string, ThreadState>>({});
   const threadsRef = useRef(threads);
   const propsRef = useRef(props); propsRef.current = props;
@@ -79,17 +91,14 @@ export function ChatView(props: ChatViewProps) {
   const [resetOpen, setResetOpen] = useState(false);
   const [resetBusy, setResetBusy] = useState(false);
   const resetIds = useRef<Record<string, string>>({});
-  const [lightbox, setLightbox] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<{id:string;chatCode:string;source:PhotoLightboxSource} | null>(null);
   const [viewerExtras,setViewerExtras]=useState<Record<string,{id:string;url:string;createdAt:string}>>({});
   const [newMessages, setNewMessages] = useState(false);
   useOverlayBack(resetOpen,()=>setResetOpen(false));
-  useOverlayBack(Boolean(lightbox),()=>setLightbox(null));
   const historyRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const resetRef = useRef<HTMLDialogElement>(null);
-  const lightboxRef = useRef<HTMLDialogElement>(null);
-  const lightboxPointer=useRef<number|null>(null);
   const nearBottom = useRef(true);
   const positions = useRef<Record<string, number>>({});
   const prepend = useRef<{ code: string; height: number; top: number } | null>(null);
@@ -100,81 +109,68 @@ export function ChatView(props: ChatViewProps) {
   const mediaRequestIds = useRef<Record<string, string>>({});
 
   const update = useCallback((code: string, fn: (state: ThreadState) => ThreadState) => {
+    if(!alive.current)return;
     let previous = threadsRef.current[code];
     if (!previous) {
       const saved = storagePrefix ? readStorage<Outgoing[]>(`${storagePrefix}.outbox.${code}`, []) : [];
-      previous = { ...fresh(), outgoing: saved.map(item => item.status === 'sending' ? { ...item, status: 'failed' as const } : item) };
+      previous = { ...fresh(), operations:storagePrefix?readStorage(`${storagePrefix}.operations.${code}`,{}):{}, cursor:storagePrefix?readStorage(`${storagePrefix}.cursor.${code}`,'0'):'0', outgoing: saved.map(item => item.status === 'sending' ? { ...item, status: 'failed' as const } : item) };
     }
     const state = fn(previous);
+    const completed=Object.entries(state.operations).filter(([,v])=>terminal.has(v.status)).slice(-50);state.operations={...Object.fromEntries(completed),...Object.fromEntries(Object.entries(state.operations).filter(([,v])=>!terminal.has(v.status)))};
     threadsRef.current = { ...threadsRef.current, [code]: state };
     setThreads(threadsRef.current);
-    if (storagePrefix) writeStorage(`${storagePrefix}.outbox.${code}`, state.outgoing);
+    if (storagePrefix) {writeStorage(`${storagePrefix}.outbox.${code}`, state.outgoing);writeStorage(`${storagePrefix}.cursor.${code}`,state.cursor);writeStorage(`${storagePrefix}.operations.${code}`,state.operations);}
   }, [storagePrefix]);
 
-  const refreshGallery = useCallback(async (code: string) => {
-    try { const result = await gateway.gallery(code); update(code, s => ({ ...s, gallery: result.media }));for(const delivery of result.video_deliveries??[]){try{await gateway.videoDelivery(delivery.delivery_id);}catch{/* Keep the existing delivery pending until eligible. */}}for(const media of result.media){if(media.video_delivery_id&&media.video_delivery_status!=='delivered'){try{await gateway.videoDelivery(media.video_delivery_id);}catch{/* Existing polling retries the same delivery. */}}} } catch { /* Offers remain locked when access cannot be verified. */ }
-  }, [gateway, update]);
+  const pendingDeliveries=useRef(new Map<string,{readyAt:string;code:string}>());
+  const refreshGallery = useCallback(async (code:string)=>{
+   try{const result=await queryClient.fetchQuery({queryKey:serverKey(scope.owner,language,'gallery',code),queryFn:({signal})=>gateway.gallery(code,signal),staleTime:0});if(!alive.current||activeRef.current!==code)return;update(code,s=>({...s,gallery:result.media}));for(const delivery of result.video_deliveries??[])pendingDeliveries.current.set(delivery.delivery_id,{readyAt:delivery.ready_at??new Date().toISOString(),code});}
+   catch(error){if(error instanceof ApiError&&[401,403].includes(error.status))update(code,s=>({...s,gallery:[]}));reportError('chat','gallery',error);}
+  },[gateway,update,scope.owner,language]);
 
-  const loadHistory = useCallback(async (code: string, before?: string) => {
+  const loadHistory = useCallback(async (code: string, before?: string,rebase=false) => {
     if (loadBusy.current.has(code)) return;
     loadBusy.current.add(code);
     update(code, s => ({ ...s, loading: true, error: null }));
     try {
-      const result = await gateway.messages(code, { before, limit: 50 });
+      const result = await gateway.messages(code, { before, limit: 50 },readAbort.current.signal);
+      if(!alive.current||activeRef.current!==code)return;
       if (before && historyRef.current && activeRef.current === code) prepend.current = { code, height: historyRef.current.scrollHeight, top: historyRef.current.scrollTop };
       update(code, s => {
-        const messages = mergeMessages(s.messages, result.messages);
-        return { ...s, messages, nextBefore: before || !s.loaded ? result.next_before : s.nextBefore,
+        const messages = mergeMessages(rebase?[]:s.messages, result.messages);
+        const snapshot=!before&&(!s.loaded||rebase);
+        return { ...s, messages:before?messages.slice(0,1000):messages.slice(-1000),windowed:rebase?false:before&&messages.length>1000||s.windowed, cursor:snapshot?(result.event_cursor??s.cursor):s.cursor,quick:snapshot?(result.quick_replies??null):s.quick, nextBefore: before || !s.loaded || rebase ? result.next_before : s.nextBefore,
           loaded: true, loading: false, outgoing: reconcileOutgoing(s.outgoing, messages) };
       });
     } catch {
+      if(readAbort.current.signal.aborted||activeRef.current!==code)return;
       update(code, s => ({ ...s, loading: false, error: tr('Не удалось загрузить переписку. Повтори попытку.', 'Could not load this conversation. Try again.') }));
     } finally { loadBusy.current.delete(code); }
   }, [gateway, tr, update]);
 
   useEffect(() => {
-    for (const chat of chats) {
-      if (!threadsRef.current[chat.chat_code]) {
-        update(chat.chat_code, s => s);
-        void loadHistory(chat.chat_code);
-      }
-    }
-  }, [chats, loadHistory, storagePrefix, update]);
-
-  useEffect(() => {
-    let stopped = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    async function tick() {
-      await Promise.allSettled(chatsRef.current.map(async chat => {
-        const code = chat.chat_code;
-        let replayed = threadsRef.current[code]?.replayed || false;
-        let refreshMedia = false;
-        try {
-          for (let page = 0; page < 6 && !stopped; page++) {
-            const cursor = threadsRef.current[code]?.cursor || '0';
-            const result = await gateway.events(code, { after: cursor, limit: 100 });
-            if (stopped) return;
-            for (const event of result.events) {
-              if (event.type === 'media_offer' || event.type === 'media_unlocked'||event.type==='video_delivered') refreshMedia = true;
-              if (event.type === 'operation_status' && replayed && ['failed', 'stale'].includes(event.data.status)) {
-                setResetOpen(false); setLightbox(null); setCommands(false);
-                propsRef.current.notify(tr('Операция не завершилась. Данные диалога обновлены.', 'The operation did not complete. Conversation state has been refreshed.'));
-              }
-              applyEvent(code, event, replayed);
-            }
-            update(code, s => ({ ...s, cursor: result.cursor, error: s.loaded ? null : s.error }));
-            if (result.events.length < 100 || result.cursor === cursor) {
-              if (!replayed) { replayed = true; update(code, s => ({ ...s, replayed: true })); void loadHistory(code); }
-              break;
-            }
-          }
-          if (refreshMedia||code===activeRef.current){await refreshGallery(code);void loadHistory(code);}
-        } catch {
-          if (activeRef.current === code) update(code, s => ({ ...s, error: tr('Связь прервана. Переподключаемся…', 'Connection lost. Reconnecting…') }));
-        }
-      }));
-      if (!stopped) timer = setTimeout(() => { void tick(); }, document.visibilityState === 'hidden' ? 8000 : 2500);
-    }
+    if(!chatCode||chatCode==='system')return;
+    const code=chatCode;let stopped=false;readAbort.current.abort();readAbort.current=new AbortController();
+    // Only the visible conversation owns a history/event chain. Outbox/cursor stay owner-scoped.
+    threadsRef.current={};setThreads({});update(code,s=>s);
+    const stop=startPolling(async()=>{
+      if(!threadsRef.current[code]?.loaded){await loadHistory(code);if(!threadsRef.current[code]?.loaded)throw new ApiError(0,'history_unavailable');await refreshGallery(code);}
+      let refreshMedia=false,refreshHistory=false;
+      try{for(let page=0;page<6&&!stopped;page++){
+        if(document.visibilityState==='hidden'||!navigator.onLine)break;
+        const state=threadsRef.current[code];const cursor=state?.cursor??'0';
+        const ids=Object.entries(state?.operations??{}).filter(([,v])=>!terminal.has(v.status)).map(([id])=>id).slice(0,50);
+        const result=await gateway.events(code,{after:cursor,limit:100,...(ids.length?{operation_ids:ids.join(',')}:{})},readAbort.current.signal);
+        if(stopped)return false;
+        for(const event of result.events){if(['media_offer','media_unlocked','video_delivered'].includes(event.type))refreshMedia=true;if(event.type==='video_delivered')refreshHistory=true;applyEvent(code,event,true);}
+        for(const op of result.operations??[])applyEvent(code,{cursor:result.cursor,created_at:new Date().toISOString(),type:'operation_status',data:{...op,error_code:null}},true);
+        update(code,s=>({...s,cursor:result.cursor,replayed:true,error:null}));
+        if(result.events.length<100||result.cursor===cursor)break;
+      }}catch(error){if(error instanceof ApiError&&['event_cursor_gap','invalid_cursor'].includes(error.code)){await loadHistory(code,undefined,true);await refreshGallery(code);return true;}throw error;}
+      if(refreshMedia)await refreshGallery(code);if(refreshHistory)await loadHistory(code);
+      for(const [id,delivery] of [...pendingDeliveries.current].filter(([,v])=>v.code===code&&Date.parse(v.readyAt)<=Date.now()).slice(0,10)){try{const value=await gateway.videoDelivery(id);if(value.status==='delivered'){pendingDeliveries.current.delete(id);await loadHistory(code);await refreshGallery(code);}}catch(error){delivery.readyAt=new Date(Date.now()+30_000).toISOString();reportError('chat','video_delivery',error);}}
+      return Object.values(threadsRef.current[code]?.operations??{}).some(op=>!terminal.has(op.status))||pendingDeliveries.current.size>0;
+    },error=>{if(!stopped){update(code,s=>({...s,error:tr('Связь прервана. Переподключаемся…','Connection lost. Reconnecting…')}));reportError('chat','events',error);}});
     function applyEvent(code: string, event: WebEvent, live: boolean) {
       update(code, s => {
         if (event.type === 'message') {
@@ -182,7 +178,7 @@ export function ChatView(props: ChatViewProps) {
           const isNew = !s.messages.some(m => m.id === event.data.id);
           const messages = mergeMessages(s.messages, [event.data]);
           if (isNew && code === activeRef.current && !nearBottom.current) setNewMessages(true);
-          return { ...s, messages, outgoing: reconcileOutgoing(s.outgoing, messages),
+          return { ...s, messages:s.windowed?messages.slice(0,1000):messages.slice(-1000), outgoing: reconcileOutgoing(s.outgoing, messages),
             quick: event.data.role === 'user' ? null : s.quick,
             unread: code !== activeRef.current && isNew && event.data.role === 'assistant' ? s.unread + 1 : s.unread };
         }
@@ -195,6 +191,7 @@ export function ChatView(props: ChatViewProps) {
         }
         if (event.type === 'operation_status') {
           const { operation_id: id, status, action } = event.data;
+          if(['failed','stale'].includes(status)&&s.operations[id]?.status!==status)queueMicrotask(()=>{if(alive.current)propsRef.current.notify(tr('Операция не завершилась. Данные диалога обновлены.','The operation did not complete. Conversation state has been refreshed.'));});
           const outgoing = s.outgoing.flatMap(item => item.operationId === id && status === 'completed' ? [] :
             [{ ...item, ...(item.operationId === id && ['failed', 'stale'].includes(status) ? { status: 'failed' as const } : {}) }]);
           return { ...s, operations: { ...s.operations, [id]: { status, action } }, outgoing };
@@ -202,30 +199,26 @@ export function ChatView(props: ChatViewProps) {
         return s;
       });
     }
-    void tick();
-    return () => { stopped = true; clearTimeout(timer); };
-  }, [gateway, loadHistory, refreshGallery, tr, update]);
+    return()=>{stopped=true;stop();readAbort.current.abort();pendingDeliveries.current.clear();};
+  },[chatCode,gateway,loadHistory,refreshGallery,update,reconnect]);
 
   useEffect(() => {
     setCommands(false); setResetOpen(false); setLightbox(null);setViewerExtras({}); setNewMessages(false);
     if (chatCode&&chatCode!=='system') {
       update(chatCode, s => ({ ...s, unread: 0 }));
-      void loadHistory(chatCode); void refreshGallery(chatCode);
-      const code=chatCode;setContinuing(false);
+
+      const code=chatCode;setContinuing(false);setModeNotice(null);
+
       void gateway.continuation(code).then(result=>{if(activeRef.current!==code)return;setContinuing(result.offered);if(result.messages.length)update(code,s=>({...s,messages:mergeMessages(s.messages,result.messages)}));}).catch(()=>{});
-    } else setCollapsed(false);
+    } else {setCollapsed(false);readAbort.current.abort();}
   }, [chatCode, loadHistory, refreshGallery, update]);
-  useEffect(() => { if (storagePrefix) writeStorage(`${storagePrefix}.drafts`, drafts); }, [drafts, storagePrefix]);
+  useEffect(()=>{if(!chatCode)return;const imported=chats.find(c=>c.chat_code===chatCode);const marker=storagePrefix?storagePrefix+'.mode.'+chatCode:null;if(imported?.origin==='telegram'&&imported.scene_mode&&marker&&!readPersistent(marker)){setModeNotice(imported.scene_mode);try{localStorage.setItem(marker,'1');}catch{}}},[chatCode,chats,storagePrefix]);
+  useEffect(() => { if (storagePrefix) {writeStorage(`${storagePrefix}.drafts`, drafts);window.dispatchEvent(new Event('mp-drafts-changed'));} }, [drafts, storagePrefix]);
   useEffect(() => {
     const dialog = resetRef.current;
     if (resetOpen && dialog && !dialog.open) dialog.showModal();
     if (!resetOpen && dialog?.open) dialog.close();
   }, [resetOpen]);
-  useEffect(() => {
-    const dialog = lightboxRef.current;
-    if (lightbox && dialog && !dialog.open) dialog.showModal();
-    if (!lightbox && dialog?.open) dialog.close();
-  }, [lightbox]);
   useEffect(() => {
     if (!commands) return;
     const dismiss = (e: PointerEvent) => { if (!menuRef.current?.contains(e.target as Node)) setCommands(false); };
@@ -244,9 +237,6 @@ export function ChatView(props: ChatViewProps) {
   const visibleMedia = current.nextBefore && current.messages.length ? timelineMedia.filter(m => m.at >= current.messages[0].created_at) : timelineMedia;
   const totalItems = current.messages.length + visibleMedia.length + visibleOutgoing.length;
   const lightboxPhotos=[...new Map([...Object.values(viewerExtras),...authorizedPhotos(current.messages,current.gallery)].map(photo=>[photo.id,photo])).values()].filter(photo=>safeImage(photo.url)).sort((a,b)=>a.createdAt.localeCompare(b.createdAt)||a.id.localeCompare(b.id));
-  const lightboxIndex=lightboxPhotos.findIndex(photo=>photo.id===lightbox);
-  const lightboxPhoto=lightboxPhotos[lightboxIndex];
-  const moveLightbox=(direction:number)=>{const next=lightboxPhotos[lightboxIndex+direction];if(next)setLightbox(next.id);};
   useLayoutEffect(() => {
     const element = historyRef.current;
     if (!element || !chatCode) return;
@@ -279,6 +269,7 @@ export function ChatView(props: ChatViewProps) {
   }
   function send(text: string) {
     if (!chatCode || !text.trim()) return;
+    if((threadsRef.current[chatCode]?.outgoing.length??0)>=50){notify(tr('Дождись завершения отправленных сообщений.','Wait for the sent messages to finish.'));return;}
     const item: Outgoing = { id: crypto.randomUUID(), text: text.trim(), createdAt: new Date().toISOString(), status: 'sending' };
     update(chatCode, s => ({ ...s, quick: null, outgoing: [...s.outgoing, item] }));
     setDrafts(s => ({ ...s, [chatCode]: '' }));
@@ -290,7 +281,7 @@ export function ChatView(props: ChatViewProps) {
     if (!chatCode) return;
     if (commands) { setCommands(false); return; }
     setCommands(true); setCatalogLoading(true); setProducts([]);
-    try { const result = await gateway.catalog(chatCode); setProducts(result.products.filter(p => p.kind !== 'photo'&&p.feature_key!=='video_unlock')); }
+    try { const result = await queryClient.fetchQuery({queryKey:serverKey(scope.owner,language,'catalog',chatCode),queryFn:({signal})=>gateway.catalog(chatCode,signal),staleTime:15_000}); setProducts(result.products.filter(p => p.kind !== 'photo'&&p.feature_key!=='video_unlock')); }
     catch { setCommands(false); notify(tr('Не удалось загрузить доступные действия.', 'Could not load available actions.')); }
     finally { setCatalogLoading(false); }
   }
@@ -317,7 +308,7 @@ export function ChatView(props: ChatViewProps) {
   async function unlock(mediaId: string, sku: string) {
     if (!chatCode || mediaBusy.current.has(mediaId)) return;
     mediaBusy.current.add(mediaId);
-    mediaRequestIds.current[mediaId] ||= crypto.randomUUID();
+    const key=`${storagePrefix}.unlock.${chatCode}.${mediaId}`;mediaRequestIds.current[mediaId] ||= readStorage<string|null>(key,null)??crypto.randomUUID();writeStorage(key,mediaRequestIds.current[mediaId]);
     try {
       const result = await gateway.unlockMedia(chatCode, mediaId, { client_message_id: mediaRequestIds.current[mediaId] });
       if ('unlocked' in result && result.unlocked) { await refreshGallery(chatCode); notify(tr('Фотография открыта.', 'Photo unlocked.')); }
@@ -337,12 +328,14 @@ export function ChatView(props: ChatViewProps) {
         const key=`${storagePrefix}.video.${chatCode}.${mediaId}`;let id=readStorage<string|null>(key,null);if(!id){id=crypto.randomUUID();writeStorage(key,id);}
         const delivery=await gateway.requestVideo(chatCode,mediaId,id);try{await gateway.videoDelivery(delivery.delivery_id);}catch{/* eligible_at is enforced on the server. */}
         await refreshGallery(chatCode);await loadHistory(chatCode);
-      }else{const catalog=await gateway.catalog(chatCode);setVideoOffers({mediaId,products:catalog.products.filter(p=>p.feature_key==='video_unlock'||p.feature_key==='video_pass'||p.subscription_tier==='full')});}
+      }else{const catalog=await queryClient.fetchQuery({queryKey:serverKey(scope.owner,language,'catalog',chatCode),queryFn:({signal})=>gateway.catalog(chatCode,signal),staleTime:15_000});setVideoOffers({mediaId,products:catalog.products.filter(p=>p.feature_key==='video_unlock'||p.feature_key==='video_pass'||p.subscription_tier==='full')});}
     }catch{notify(tr('Не удалось запросить видео. Повтор использует ту же выдачу.','Could not request the video. Retrying uses the same delivery.'));}finally{setVideoBusy(null);}
   }
   const readId=useRef<Record<string,string>>({});
   const markVisibleRead=useCallback(()=>{if(!chatCode||isSystem||document.visibilityState!=='visible'||!nearBottom.current)return;const last=threadsRef.current[chatCode]?.messages.at(-1);if(!last||readId.current[chatCode]===last.id)return;const code=chatCode;gateway.markRead(code,last.id).then(()=>{readId.current[code]=last.id;onRefreshChats();}).catch(()=>{});},[chatCode,isSystem,gateway,onRefreshChats]);
   useEffect(()=>{markVisibleRead();const visible=()=>markVisibleRead();document.addEventListener('visibilitychange',visible);return()=>document.removeEventListener('visibilitychange',visible);},[markVisibleRead,current.messages]);
+  useEffect(()=>{setActivity('chat-draft',Object.values(drafts).some(Boolean));return()=>setActivity('chat-draft',false);},[drafts]);
+  useEffect(()=>{setActivity('chat-pending',writer||resetBusy||!!videoBusy);return()=>setActivity('chat-pending',false);},[writer,resetBusy,videoBusy]);
   const clock = (date: string) => { try { return new Intl.DateTimeFormat(language, { hour: '2-digit', minute: '2-digit' }).format(new Date(date)); } catch { return ''; } };
 
   return <section className={`chat-shell ${chatCode ? 'chat-has-active' : ''} ${collapsed ? 'chat-collapsed' : ''}`} aria-label={tr('Чаты', 'Chats')}>
@@ -370,7 +363,7 @@ export function ChatView(props: ChatViewProps) {
           <div className="chat-title"><strong>{character?.name || tr('Переписка', 'Conversation')}</strong><span>{writer ? tr('Печатает…', 'Typing…') : chat?.scene_mode === 'fast' ? 'Fast' : chat?.scene_mode === 'roleplay' ? 'Roleplay' : tr('Ваша история', 'Your story')}</span></div>
           <button className="chat-icon chat-close" onClick={() => { if (historyRef.current) positions.current[chatCode] = historyRef.current.scrollTop; onClose(); }} aria-label={tr('Закрыть диалог', 'Close conversation')}>↗</button>
         </header>
-        {current.error && <div className="chat-connection" role="status">{current.error}<button onClick={() => void loadHistory(chatCode)}>{tr('Повторить', 'Retry')}</button></div>}
+        {modeNotice&&<div className="chat-connection" role="status">{modeNotice==='fast'?tr('Выбран режим «Погорячее»','The “Hotter” mode is selected'):tr('Выбран режим «История»','The “Story” mode is selected')}<button onClick={()=>setModeNotice(null)}>{tr('Закрыть','Close')}</button></div>}{current.error && <div className="chat-connection" role="status">{current.error}<button onClick={() => setReconnect(n=>n+1)}>{tr('Повторить', 'Retry')}</button></div>}
         {continuing&&<div className="chat-connection" role="status">{tr('Продолжаем вашу историю из Telegram.','Continuing your story from Telegram.')}<button onClick={()=>setContinuing(false)}>{tr('Закрыть','Close')}</button></div>}
         <div className="chat-history" ref={historyRef} role="log" aria-label={tr('История сообщений', 'Message history')} aria-live="polite" aria-relevant="additions text" onScroll={e => {
           const el = e.currentTarget; positions.current[chatCode] = el.scrollTop;
@@ -378,7 +371,7 @@ export function ChatView(props: ChatViewProps) {
           if (nearBottom.current) {setNewMessages(false);markVisibleRead();}
         }}>
           <div className="chat-history-inner">
-            {current.nextBefore && <button className="chat-history-more" disabled={current.loading} onClick={() => void loadHistory(chatCode, current.nextBefore || undefined)}>{current.loading ? tr('Загружаем…', 'Loading…') : tr('Ранние сообщения ↑', 'Earlier messages ↑')}</button>}
+            {current.windowed&&<button className="chat-history-more" onClick={()=>void loadHistory(chatCode,undefined,true)}>{tr("К последним сообщениям","Back to latest messages")}</button>}{current.nextBefore && <button className="chat-history-more" disabled={current.loading} onClick={() => void loadHistory(chatCode, current.nextBefore || undefined)}>{current.loading ? tr('Загружаем…', 'Loading…') : tr('Ранние сообщения ↑', 'Earlier messages ↑')}</button>}
             {!current.loaded && current.loading && <div className="chat-loading" role="status">{tr('Возвращаем вашу историю…', 'Loading your story…')}</div>}
             {current.loaded && !totalItems && <div className="chat-conversation-start"><span>✳</span><p>{tr('Ваша история начинается здесь.', 'Your story begins here.')}</p></div>}
             {[...current.messages.map(message => ({ kind: 'message' as const, at: message.created_at, message })), ...visibleMedia.map(media => ({ kind: 'media' as const, at: media.at, media }))].sort((a, b) => a.at.localeCompare(b.at)).map(item => {
@@ -388,7 +381,7 @@ export function ChatView(props: ChatViewProps) {
               const access = current.gallery.find(m => m.media_id === mediaId);
               const photo = access?.unlocked ? safeImage(access.photo_url) : item.kind==='message'?safeImage(item.message.photo_url):undefined;
               return <article key={`media-${mediaId}`} className="chat-media">
-                <PhotoPanelCard gateway={gateway} chatCode={chatCode} sceneSessionId={chat?.scene_session_id??null} mediaId={mediaId} anchor={access?.panel_media_id} photoUrl={photo} access={access} gallery={current.gallery} storageScope={storagePrefix} videoBusy={videoBusy!==null} onOpen={(id,url)=>{setViewerExtras(old=>({...old,[id]:{id,url,createdAt:item.at}}));setLightbox(id);}} onUnlock={unlock} onAnimate={id=>void animatePhoto(id)} onChanged={()=>void refreshGallery(chatCode)}/>
+                <PhotoPanelCard gateway={gateway} chatCode={chatCode} sceneSessionId={chat?.scene_session_id??null} mediaId={mediaId} anchor={access?.panel_media_id} photoUrl={photo} access={access} gallery={current.gallery} storageScope={storagePrefix} videoBusy={videoBusy!==null} onOpen={(id,url,source)=>{setViewerExtras(old=>({...old,[id]:{id,url,createdAt:item.at}}));setLightbox({id,chatCode,source});}} onUnlock={unlock} onAnimate={id=>void animatePhoto(id)} onChanged={()=>void refreshGallery(chatCode)}/>
                 <time>{clock(item.at)}</time>
               </article>;
             })}
@@ -420,7 +413,7 @@ export function ChatView(props: ChatViewProps) {
     <dialog className="chat-dialog" ref={resetRef} onCancel={() => setResetOpen(false)} onClick={e => { if (e.target === e.currentTarget) setResetOpen(false); }}>
       <div className="chat-dialog-content"><div className="chat-dialog-title"><h2>{tr('Новая сцена', 'A new scene')}</h2><button className="chat-icon" onClick={() => setResetOpen(false)} aria-label={tr('Закрыть', 'Close')}>×</button></div><p>{tr('Начни заново с тем же персонажем. Переписка останется в истории.', 'Start again with the same character. Your messages stay in history.')}</p><div className="chat-reset-modes">{(['fast', 'roleplay'] as const).map(mode => <button key={mode} disabled={resetBusy} onClick={() => void resetScene(mode)}>{mode === 'fast' ? 'Fast' : 'Roleplay'}<span>{tr('Начать новую сцену', 'Start a new scene')}</span></button>)}</div><button className="chat-continue" onClick={() => setResetOpen(false)}>{tr('Хочу продолжить текущий диалог', 'Continue this conversation')}</button></div>
     </dialog>
-    <dialog className="chat-lightbox" ref={lightboxRef} onCancel={() => setLightbox(null)} onKeyDown={e=>{if(e.key==='ArrowLeft'){e.preventDefault();moveLightbox(-1);}if(e.key==='ArrowRight'){e.preventDefault();moveLightbox(1);}}} onClick={e => { if (e.target === e.currentTarget) setLightbox(null); }}><button className="chat-lightbox-close chat-icon" onClick={() => setLightbox(null)} aria-label={tr('Закрыть фотографию', 'Close photo')}>×</button>{lightboxPhoto&&<img src={safeImage(lightboxPhoto.url)} draggable={false} alt={tr('Фотография из диалога', 'Conversation photo')} onPointerDown={e=>{lightboxPointer.current=e.clientX;}} onPointerUp={e=>{if(lightboxPointer.current!==null){const delta=e.clientX-lightboxPointer.current;if(Math.abs(delta)>45)moveLightbox(delta<0?1:-1);}lightboxPointer.current=null;}} onPointerCancel={()=>{lightboxPointer.current=null;}}/>}{lightboxPhotos.length>1&&<nav className="chat-lightbox-navigation" aria-label={tr('Полученные фотографии','Received photos')}><button className="chat-icon" disabled={lightboxIndex<=0} onClick={()=>moveLightbox(-1)} aria-label={tr('Предыдущая фотография','Previous photo')}>‹</button><span aria-live="polite">{lightboxIndex+1} / {lightboxPhotos.length}</span><button className="chat-icon" disabled={lightboxIndex>=lightboxPhotos.length-1} onClick={()=>moveLightbox(1)} aria-label={tr('Следующая фотография','Next photo')}>›</button></nav>}</dialog>
+    {lightbox&&lightbox.chatCode===chatCode&&<PhotoLightbox photos={lightboxPhotos} selectedId={lightbox.id} source={lightbox.source} onSelect={id=>setLightbox(current=>current?{...current,id}:null)} onClose={()=>setLightbox(null)}/>}
   </section>;
 }
 

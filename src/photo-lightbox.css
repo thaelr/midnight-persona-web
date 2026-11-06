@@ -1,0 +1,12 @@
+:root:has(.photo-lightbox[open]){overflow:hidden}
+.chat-lightbox.photo-lightbox{position:fixed;inset:0;padding:64px 25px 68px;color:var(--paper);touch-action:pan-y;overscroll-behavior:contain}
+.photo-lightbox .photo-lightbox-stage{position:relative;width:min(100%,calc((100dvh - 132px) * var(--photo-ratio)));aspect-ratio:var(--photo-ratio);transform-origin:0 0}
+.photo-lightbox .photo-lightbox-gesture,.photo-lightbox .photo-lightbox-frame{position:absolute;inset:0;touch-action:pan-y}
+.photo-lightbox .photo-lightbox-image{position:absolute;inset:0;width:100%;height:100%;max-width:none;max-height:none;object-fit:contain;pointer-events:none;user-select:none}
+.photo-lightbox .photo-lightbox-full{opacity:0}
+.photo-lightbox .photo-lightbox-full[data-ready=true]{opacity:1}
+.photo-lightbox .photo-lightbox-placeholder{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:20px;box-sizing:border-box;color:var(--muted);font-size:var(--type-body);pointer-events:none}
+.photo-lightbox .chat-lightbox-close,.photo-lightbox .chat-lightbox-navigation{z-index:2}
+.photo-lightbox[data-closing=true]::backdrop{background:transparent;backdrop-filter:none;transition:background var(--duration-feedback)}
+@media(max-width:640px){.chat-lightbox.photo-lightbox{padding-inline:10px}}
+@media(prefers-reduced-motion:reduce){.photo-lightbox[data-closing=true]::backdrop{transition:none}}

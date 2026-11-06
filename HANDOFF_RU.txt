@@ -1,17 +1,17 @@
-MIDNIGHT PERSONA FRONTEND — ПЕРЕДАЧА 03.11.2026
+MIDNIGHT PERSONA FRONTEND — ПЕРЕДАЧА 05.11.2026 / ТЗ v3.1
 
-Содержимое frontend/ — полный исходный проект. Существующие Midnight Violet assets и дизайн сохранены. Исходная база взята из sites/midnight-persona-web: названный в ТЗ ZIP violet(1) не был предоставлен.
+Основа: main 85edc2ca5cb39bb0f8db617b3f8967f9b986ac1d. Это полный локальный исходный проект, без node_modules/dist и результатов браузерных прогонов. Тесты и безопасные fixtures входят в исходники. Существующий дизайн и assets сохранены. Использовать вместе с согласованными Gateway/Database/n8n изменениями общего пакета.
 
-Подключать только вместе с Gateway/новыми SQL/n8n из общего ZIP. README.md и общий docs/CONTRACT_MATRIX.md описывают фактические контракты. Старую ветку web не использовать как текущую основу.
+Проверено: install --frozen-lockfile, check, api:check, 22/22 unit, build; Playwright 18/18 (17 mock + 1 реальный SW lifecycle), 4 opt-in теста пропущены обычной командой. Отдельные локальные интеграционные прогоны основного исполнителя: 3/3 Gateway/Postgres и 1/1 Gateway/Postgres/n8n/Core/Writer, ответ модели нейтральный тестовый. Реальные OAuth и списания не выполнялись. Motion use-client / большой entry chunk остаются предупреждениями сборки, не скрыты.
 
-Проверено: pnpm install --frozen-lockfile, pnpm check, pnpm test (17/17), pnpm build. Сборка под Windows потребовала выхода esbuild из файлового sandbox; production-сервисы не затронуты. Существующие Motion use-client и chunk-size warnings сборку не останавливают.
+Ключевые изменения: Telegram→Google→Guest, независимые ошибки и bootstrap recovery, TanStack Query и owner-scoped cache, один active-chat polling с snapshot/cursor/operation recovery, account subscriptions без чата, server-only photo position/count/права/цены, bounded caches/history, безопасный PWA update всех вкладок после часа в фоне, public legal pages, OpenAPI-generated types и runtime guards.
 
-Словари localization/{ru,en}/{web,commerce}.json импортируются общей SQL-миграцией; не заменять существующие данные Telegram. commerce.product_types использует semantic feature/tier keys, а не придуманные SKU. Имена продуктов, цены и права определяет Gateway.
+Публичные значения config из main сохранены. Изменены только termsUrl=/terms, privacyUrl=/privacy и добавлен telegramAuthProvider без выдуманного значения. Реальные provider/origin/claims/IPN/Storage настройки остаются внешними зависимостями; кабинеты не изменялись.
 
-public/config.json намеренно оставлен с пустыми непредоставленными реальными URL/key/contact полями. После ручного заполнения выполнить сборку. Service role, payment secrets, Telegram token и n8n credentials в браузер не переносить.
+Тексты вставляет владелец в src/legal/content.ts: legalContent.terms.ru, terms.en, privacy.ru, privacy.en. Пока тексты пусты, страницы сообщают об этом; новый consent недоступен. Готовые URL /terms?lang=ru|en и /privacy?lang=ru|en работают без Auth/Gateway.
 
-Встроенные QA fixtures исключены из итоговой поставки. Локальные тесты и браузерные фикстуры не подтверждают реальные OAuth, Telegram linking, IPN, приватный Storage и скрытый Writer E2E. Коммиты, push, migrations/import/deploy и реальные оплаты исполнителем не выполнялись.
+Словари localization/{ru,en}/{web,commerce}.json согласованы с новой database migration. OpenAPI snapshot contracts/openapi.web.json генерируется scripts/generate-api.mjs в src/lib/generated-api.d.ts; api:check проверяет дрейф.
 
+Счётчики 10-секундного браузерного сценария с 10 чатами: каталог больше не делает history/events запросы (было 20/30, стало 0/0); активный чат делает по одному history/events, не опрашивая остальные 9 чатов. Это локальная fixture-метрика, не production p95. Логи и ограничения — в общем reports/frontend.md и verification/.
 
-Фотопанель: доступны серверные предыдущая/следующая/ещё фото, сохранены существующие права и лимит панели. Новое закрытое предложение не раскрывает URL. Полноэкранный просмотр переключает только уже доступные фото и сохраняет место в истории при закрытии.
-
+Никаких commit/push/deploy, production SQL/n8n import, реального OAuth и оплаты не было.
