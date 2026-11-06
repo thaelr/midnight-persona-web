@@ -1,6 +1,6 @@
 import {isUpdateSafe} from './activity';
 import {reportError} from './diagnostics';
-export const HIDDEN_UPDATE_MS=60*60*1000;
+export const HIDDEN_UPDATE_MS=90*1000;
 export const backgroundEligible=(hiddenAt:number|null,now:number)=>hiddenAt!==null&&now-hiddenAt>=HIDDEN_UPDATE_MS;
 export function installPwaUpdates(registration:ServiceWorkerRegistration){
  const key='mp.pwa.hiddenAt';let hiddenAt:number|null=null,eligible=false,requested=false,recheck=false,updating=false,disposed=false;
