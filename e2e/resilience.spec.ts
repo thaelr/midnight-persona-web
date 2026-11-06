@@ -1,5 +1,5 @@
 import {test,expect} from '@playwright/test';
-import {mockApp} from './fixtures';
+import {chat,mockApp} from './fixtures';
 for(const status of [404,503])test(`A01 dictionary ${status} leaves all configured sign-in choices available`,async({context,page})=>{
  await mockApp(context,{session:false,localizationStatus:status});await page.goto('/');
  for(const name of ['Continue with Telegram','Continue with Google','Continue as a guest'])await expect(page.getByRole('button',{name})).toBeEnabled();
@@ -50,7 +50,67 @@ test('A14 panel uses the owned anchor, server 1/N, and a closed offer without it
  await context.route('**/web/chats/chat1/media',r=>r.fulfill({json:{media:[{unlocked:true,media_id:photo,media_kind:'photo',photo_url:'http://127.0.0.1:5177/neutral.svg',panel_media_id:photo,scene_session_id:'scene1',created_at:'2026-01-01T00:00:00Z'}],video_deliveries:[]}}));
  await context.route('**/web/chats/chat1/media/*/panel*',r=>{if(r.request().method()==='POST'){const input=r.request().postDataJSON();actions.push(input.action);if(input.action==='photo_next')selected=next;if(input.action==='photo_regen')offer=true;}return r.fulfill({json:{media_id:selected,photo_url:'http://127.0.0.1:5177/neutral.svg?selected='+selected,unlocked:true,scene_session_id:'scene1',position:selected===photo?1:2,count:2,actions:{previous:true,next:true,more:true},...(offer?{offer:{media_id:locked,sku:'photo-fixture',conditions:{price:{amount:'5',currency:'USD'},price_required:5}}}:{})}});});
  await context.route('**/web/chats/chat1/media/*/video',r=>r.fulfill({json:{media_id:selected,animation_available:false,video_id:null,full_active:false,video_pass_active:false,panel_delivered:false,scene_session_id:'scene1'}}));
- await page.goto('/#chats/chat1');await expect(page.getByLabel('Photo position')).toHaveText('1/2');await page.getByRole('button',{name:'Next photo',exact:true}).click();await expect(page.getByLabel('Photo position')).toHaveText('2/2');await page.getByRole('button',{name:'More photos'}).click();await expect(page.getByText('Next photo',{exact:true})).toBeVisible();expect(actions).toEqual(['photo_next','photo_regen']);expect(await page.locator('img').evaluateAll(images=>images.some(img=>img.src.includes('10000000-0000-4000-8000-000000000003')))).toBe(false);
+ await page.goto('/#chats/chat1');await expect(page.getByLabel('Photo position')).toHaveText('1/2');await page.getByRole('button',{name:'Next item',exact:true}).click();await expect(page.getByLabel('Photo position')).toHaveText('2/2');await page.getByRole('button',{name:'More photos'}).click();await expect(page.getByText('Next photo',{exact:true})).toBeVisible();expect(actions).toEqual(['photo_next','photo_regen']);expect(await page.locator('img').evaluateAll(images=>images.some(img=>img.src.includes('10000000-0000-4000-8000-000000000003')))).toBe(false);
 });
 
 test('A18 Commerce failure leaves profile editing and catalog available',async({context,page})=>{await mockApp(context);await context.route('**/web/commerce/catalog*',r=>r.fulfill({status:503,json:{error:'unavailable'}}));await page.goto('/#profile');await page.getByRole('button',{name:/Test reader/}).click();await expect(page.getByLabel('Your name',{exact:true})).toBeEditable();await page.getByRole('button',{name:'Characters',exact:true}).click();await expect(page.getByRole('button',{name:/Character 1/}).first()).toBeVisible();});
+
+test('VideoPass panel keeps the selected photo, its paired video and one card after refresh',async({context,page})=>{
+ test.setTimeout(60_000);
+ await mockApp(context,{chats:1});
+ const photos=[1,2,3].map(n=>'10000000-0000-4000-8000-00000000000'+n);
+ const source='10000000-0000-4000-8000-000000000004',id='20000000-0000-4000-8000-000000000001';
+ const picture=(photo:string)=>'http://127.0.0.1:5177/neutral.svg?photo='+photo;
+ const panel='8123',scene='scene1';let alternate=false,started=0,requests=0,activeScene=scene;
+ await context.route('**/web/chats',r=>r.fulfill({json:{chats:[{...chat(1),scene_session_id:activeScene}]}}));
+ function receipt(){
+  const same=!alternate,ready=started+(same?5000:7000);
+  return {delivery_id:id,video_id:id,status:Date.now()>=ready?'delivered':'queued',panel_id:panel,scene_session_id:scene,
+   requested_photo_uuid:photos[1],source_photo_uuid:same?photos[1]:source,same_photo:same,source_photo_url:picture(same?photos[1]:source),
+   source_photo_reveal_at:new Date(started+2000).toISOString(),ready_at:new Date(ready).toISOString(),
+   access_path:'/web/commerce/video-deliveries/'+id};
+ }
+ await context.route('**/web/chats/chat1/media',r=>r.fulfill({json:{
+  media:photos.map((media_id,i)=>({media_id,media_kind:'photo',unlocked:true,photo_url:picture(media_id),panel_media_id:photos[0],
+   panel_id:panel,scene_session_id:scene,created_at:new Date(Date.UTC(2026,0,1,0,0,i)).toISOString()})),
+  video_deliveries:started?[receipt()]:[]}}));
+ await context.route('**/web/chats/chat1/media/*/panel*',r=>{
+  const url=new URL(r.request().url());expect(url.pathname.split('/').at(-2)).toBe(photos[0]);
+  const input=r.request().method()==='POST'?r.request().postDataJSON():null;
+  let i=photos.indexOf(input?.current_media_id??url.searchParams.get('current_media_id')??photos[0]);expect(i).toBeGreaterThanOrEqual(0);
+  if(input)i=(i+(input.action==='photo_next'?1:-1)+photos.length)%photos.length;
+  return r.fulfill({json:{media_id:photos[i],photo_url:picture(photos[i]),unlocked:true,scene_session_id:scene,
+   position:i+1,count:photos.length,actions:{previous:true,next:true,more:false}}});
+ });
+ await context.route('**/web/chats/chat1/media/*/video',r=>{
+  const selected=new URL(r.request().url()).pathname.split('/').at(-2);
+  if(r.request().method()==='POST'){expect(selected).toBe(photos[1]);requests++;started=Date.now();return r.fulfill({json:receipt()});}
+  return r.fulfill({json:{media_id:selected,animation_available:selected===photos[1]&&!started,
+   video_id:id,full_active:false,video_pass_active:true,panel_delivered:Boolean(started),scene_session_id:scene}});
+ });
+ await context.route('**/web/commerce/video-deliveries/*',r=>r.fulfill({json:{...receipt(),video_url:'https://gateway.test/fixture.mp4'}}));
+ await context.route('**/fixture.mp4',r=>r.fulfill({status:204}));
+ const card=page.locator('.chat-photo-panel'),next=card.getByRole('button',{name:'Next item'}),prev=card.getByRole('button',{name:'Previous item'});
+ const visiblePhoto=async(photo:string)=>expect(card.locator('[data-photo-id]')).toHaveAttribute('data-photo-id',photo);
+ for(const alternative of [false,true]){
+  alternate=alternative;started=0;requests=0;activeScene=scene;
+  await page.goto('/#chats/chat1');await page.reload();
+  await expect(card).toHaveCount(1);await visiblePhoto(photos[0]);await next.click();await visiblePhoto(photos[1]);
+  await card.getByRole('button',{name:/Animate photo/}).click();
+  if(alternate)await expect(card.locator('[data-photo-id]')).toHaveAttribute('data-photo-id',source,{timeout:5000});
+  await expect(card.locator('video')).toHaveCount(1,{timeout:12_000});
+  await next.click();await visiblePhoto(photos[2]);await prev.click();await expect(card.locator('video')).toHaveCount(1);
+  if(alternate){await prev.click();await visiblePhoto(source);}
+  await prev.click();await visiblePhoto(photos[1]);await prev.click();await visiblePhoto(photos[0]);
+  await next.click();await visiblePhoto(photos[1]);
+  if(alternate){await next.click();await visiblePhoto(source);}
+  await next.click();await expect(card.locator('video')).toHaveCount(1);
+  activeScene='replacement-scene';await page.reload();await expect(card).toHaveCount(1);
+  await expect(page.locator('.chat-media')).toHaveCount(1);await expect(card.locator('video')).toHaveCount(1);
+  await expect(card.getByLabel('Photo position')).toHaveText(alternate?'4/5':'3/4');
+  await prev.click();await visiblePhoto(alternate?source:photos[1]);
+  if(alternate){await prev.click();await visiblePhoto(photos[1]);}
+  await prev.click();await visiblePhoto(photos[0]);
+  await expect(card.getByRole('button',{name:/More photos|Animate photo/})).toHaveCount(0);expect(requests).toBe(1);
+ }
+});

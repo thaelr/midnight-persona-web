@@ -8,6 +8,7 @@ import {useCopy} from './lib/localization';
 import {useOverlayBack} from './lib/overlayBack';
 import {authorizedPhotos} from './lib/photoViewer';
 import {PhotoPanelCard} from './PhotoPanelCard';
+import {OfferPrice} from './components/OfferPrice';
 import {PhotoLightbox, type PhotoLightboxSource} from './PhotoLightbox';
 import {ChatVideo} from './ChatVideo';
 import {SystemFeed} from './Community';
@@ -236,9 +237,16 @@ export function ChatView(props: ChatViewProps) {
   const draft = chatCode ? drafts[chatCode] || '' : '';
   const writer = Object.values(current.operations).some(op => ['message', 'scene_start', 'reset'].includes(op.action) && !terminal.has(op.status));
   const visibleOutgoing = current.outgoing.filter(o => !o.matchedMessageId || o.status === 'failed');
-  const timelineMedia=[...new Map([...current.media,...current.gallery.filter(m=>m.created_at).map(m=>({id:m.media_id,at:m.created_at!,sceneId:m.scene_session_id??null,...(!m.unlocked?{sku:m.sku}:{})}))].map(m=>[m.id,m])).values()].filter(m=>!current.messages.some(message=>message.media_kind==='photo'&&message.media_id===m.id));
+  // The gallery also feeds the lightbox. Group only the conversation cards by their owned panel.
+  const galleryEntry=(id:string,scene:string|null|undefined)=>current.gallery.find(m=>m.media_id===id&&m.scene_session_id===scene);
+  const isPanelChild=(id:string,scene:string|null|undefined)=>{
+    const entry=galleryEntry(id,scene);
+    return Boolean(entry?.panel_id&&entry.panel_media_id!==id&&current.gallery.some(m=>m.media_id===entry.panel_media_id&&m.panel_id===entry.panel_id&&m.scene_session_id===entry.scene_session_id));
+  };
+  const timelineMessages=current.messages.filter(m=>!(m.media_kind==='photo'&&m.media_id&&isPanelChild(m.media_id,m.scene_session_id))&&!(m.media_kind==='video'&&current.videoDeliveries.some(d=>d.delivery_id===m.video_delivery_id&&d.panel_id&&d.requested_photo_uuid)));
+  const timelineMedia=[...new Map([...current.media,...current.gallery.filter(m=>m.created_at).map(m=>({id:m.media_id,at:m.created_at!,sceneId:m.scene_session_id??null,...(!m.unlocked?{sku:m.sku}:{})}))].map(m=>[m.id,m])).values()].filter(m=>!isPanelChild(m.id,m.sceneId)&&!timelineMessages.some(message=>message.media_kind==='photo'&&message.media_id===m.id));
   const visibleMedia = current.nextBefore && current.messages.length ? timelineMedia.filter(m => m.at >= current.messages[0].created_at) : timelineMedia;
-  const totalItems = current.messages.length + visibleMedia.length + visibleOutgoing.length;
+  const totalItems = timelineMessages.length + visibleMedia.length + visibleOutgoing.length;
   const lightboxPhotos=[...new Map([...Object.values(viewerExtras),...authorizedPhotos(current.messages,current.gallery)].map(photo=>[photo.id,photo])).values()].filter(photo=>safeImage(photo.url)).sort((a,b)=>a.createdAt.localeCompare(b.createdAt)||a.id.localeCompare(b.id));
   useLayoutEffect(() => {
     const element = historyRef.current;
@@ -284,7 +292,7 @@ export function ChatView(props: ChatViewProps) {
     if (!chatCode) return;
     if (commands) { setCommands(false); return; }
     setCommands(true); setCatalogLoading(true); setProducts([]);
-    try { const result = await queryClient.fetchQuery({queryKey:serverKey(scope.owner,language,'catalog',chatCode),queryFn:({signal})=>gateway.catalog(chatCode,signal),staleTime:15_000}); setProducts(result.products.filter(p => p.kind !== 'photo'&&p.feature_key!=='video_unlock')); }
+    try { const result = await queryClient.fetchQuery({queryKey:serverKey(scope.owner,language,'catalog',chatCode),queryFn:({signal})=>gateway.catalog(chatCode,signal),staleTime:0}); setProducts(result.products.filter(p => p.kind !== 'photo'&&p.feature_key!=='video_unlock')); }
     catch { setCommands(false); notify(tr('Не удалось загрузить доступные действия.', 'Could not load available actions.')); }
     finally { setCatalogLoading(false); }
   }
@@ -331,7 +339,7 @@ export function ChatView(props: ChatViewProps) {
         const key=`${storagePrefix}.video.${chatCode}.${mediaId}`;let id=readStorage<string|null>(key,null);if(!id){id=crypto.randomUUID();writeStorage(key,id);}
         const delivery=await gateway.requestVideo(chatCode,mediaId,id);onVideoStatus(delivery.same_photo===false?tr('Подготавливаем фото для оживления','Preparing a photo for animation'):tr('Оживляем фото','Animating photo'));
         await refreshGallery(chatCode);await loadHistory(chatCode);
-      }else{const catalog=await queryClient.fetchQuery({queryKey:serverKey(scope.owner,language,'catalog',chatCode),queryFn:({signal})=>gateway.catalog(chatCode,signal),staleTime:15_000});setVideoOffers({mediaId,products:catalog.products.filter(p=>p.feature_key==='video_unlock'||p.feature_key==='video_pass'||p.subscription_tier==='full')});}
+      }else{const catalog=await queryClient.fetchQuery({queryKey:serverKey(scope.owner,language,'catalog',chatCode),queryFn:({signal})=>gateway.catalog(chatCode,signal),staleTime:0});setVideoOffers({mediaId,products:catalog.products.filter(p=>p.feature_key==='scene_unlock'||p.feature_key==='video_unlock'||p.feature_key==='video_pass'||p.subscription_tier==='full')});}
     }catch{onVideoStatus(null);notify(tr('Не удалось запросить видео. Повтор использует ту же выдачу.','Could not request the video. Retrying uses the same delivery.'));}finally{setVideoBusy(null);}
   }
   const readId=useRef<Record<string,string>>({});
@@ -377,14 +385,15 @@ export function ChatView(props: ChatViewProps) {
             {current.windowed&&<button className="chat-history-more" onClick={()=>void loadHistory(chatCode,undefined,true)}>{tr("К последним сообщениям","Back to latest messages")}</button>}{current.nextBefore && <button className="chat-history-more" disabled={current.loading} onClick={() => void loadHistory(chatCode, current.nextBefore || undefined)}>{current.loading ? tr('Загружаем…', 'Loading…') : tr('Ранние сообщения ↑', 'Earlier messages ↑')}</button>}
             {!current.loaded && current.loading && <div className="chat-loading" role="status">{tr('Возвращаем вашу историю…', 'Loading your story…')}</div>}
             {current.loaded && !totalItems && <div className="chat-conversation-start"><span>✳</span><p>{tr('Ваша история начинается здесь.', 'Your story begins here.')}</p></div>}
-            {[...current.messages.map(message => ({ kind: 'message' as const, at: message.created_at, message })), ...visibleMedia.map(media => ({ kind: 'media' as const, at: media.at, media }))].sort((a, b) => a.at.localeCompare(b.at)).map(item => {
+            {[...timelineMessages.map(message => ({ kind: 'message' as const, at: message.created_at, message })), ...visibleMedia.map(media => ({ kind: 'media' as const, at: media.at, media }))].sort((a, b) => a.at.localeCompare(b.at)).map(item => {
               if(item.kind==='message'&&item.message.media_kind==='video'&&item.message.video_delivery_id)return <article key={item.message.id} className="chat-media"><ChatVideo gateway={gateway} deliveryId={item.message.video_delivery_id}/><time>{clock(item.at)}</time></article>;
               if (item.kind === 'message'&&!item.message.media_kind) return <article key={`m-${item.message.id}`} className={`chat-message chat-message-${item.message.role}`}><p>{item.message.text}</p><time dateTime={item.at}>{clock(item.at)}</time></article>;
               const mediaId=item.kind==='message'?item.message.media_id!:item.media.id;
-              const access = current.gallery.find(m => m.media_id === mediaId);
+              const access = galleryEntry(mediaId,item.kind==='message'?item.message.scene_session_id:item.media.sceneId);
+              const delivery=access?.panel_id?current.videoDeliveries.find(d=>d.panel_id===access.panel_id&&d.scene_session_id===access.scene_session_id):undefined;
               const photo = access?.unlocked ? safeImage(access.photo_url) : item.kind==='message'?safeImage(item.message.photo_url):undefined;
-              return <article key={`media-${mediaId}`} className="chat-media">
-                <PhotoPanelCard gateway={gateway} chatCode={chatCode} sceneSessionId={chat?.scene_session_id??null} mediaId={mediaId} anchor={access?.panel_media_id} photoUrl={photo} access={access} gallery={current.gallery} delivery={current.videoDeliveries.find(d=>d.requested_photo_uuid===mediaId)} storageScope={storagePrefix} videoBusy={videoBusy!==null} onVideoStatus={onVideoStatus} onOpen={(id,url,source)=>{setViewerExtras(old=>({...old,[id]:{id,url,createdAt:item.at}}));setLightbox({id,chatCode,source});}} onUnlock={unlock} onAnimate={id=>void animatePhoto(id)} onChanged={()=>void refreshGallery(chatCode)}/>
+              return <article key={access?.panel_id?`panel-${chatCode}-${access.scene_session_id}-${access.panel_id}`:`media-${mediaId}`} className="chat-media">
+                <PhotoPanelCard gateway={gateway} chatCode={chatCode} sceneSessionId={chat?.scene_session_id??null} mediaId={mediaId} anchor={access?.panel_media_id} photoUrl={photo} access={access} gallery={current.gallery} delivery={delivery} storageScope={storagePrefix} videoBusy={videoBusy!==null} onVideoStatus={onVideoStatus} onOpen={(id,url,source)=>{setViewerExtras(old=>({...old,[id]:{id,url,createdAt:item.at}}));setLightbox({id,chatCode,source});}} onUnlock={unlock} onAnimate={id=>void animatePhoto(id)} onChanged={()=>void refreshGallery(chatCode)}/>
                 <time>{clock(item.at)}</time>
               </article>;
             })}
@@ -402,7 +411,7 @@ export function ChatView(props: ChatViewProps) {
           })}</div>}
           <form className="chat-composer" onSubmit={submit}>
             <div className="chat-command-anchor" ref={menuRef}>
-              {commands && <div className="chat-command-menu" aria-label={tr('Действия', 'Actions')}><span className="chat-eyebrow">{tr('ВОЗМОЖНОСТИ', 'POSSIBILITIES')}</span><button onClick={() => { setCommands(false); setResetOpen(true); }} type="button">{tr('Начать новую сцену', 'Start a new scene')} <span>↗</span></button>{catalogLoading ? <p>{tr('Загружаем…', 'Loading…')}</p> : products.map(product => <button key={product.sku} type="button" onClick={() => openPurchase(product.sku,undefined,product.upgrade?'upgrade':undefined)}>{product.title}<span>↗</span></button>)}</div>}
+              {commands && <div className="chat-command-menu" aria-label={tr('Действия', 'Actions')}><span className="chat-eyebrow">{tr('ВОЗМОЖНОСТИ', 'POSSIBILITIES')}</span><button onClick={() => { setCommands(false); setResetOpen(true); }} type="button">{tr('Начать новую сцену', 'Start a new scene')} <span>↗</span></button>{catalogLoading ? <p>{tr('Загружаем…', 'Loading…')}</p> : products.map(product => <button key={product.sku} type="button" onClick={() => openPurchase(product.sku,undefined,product.upgrade?'upgrade':undefined)}>{product.title}<span>{product.feature_key==='video_pass'&&<OfferPrice product={product}/>} ↗</span></button>)}</div>}
               <button type="button" className="chat-command-button" aria-expanded={commands} aria-label={tr('Открыть меню команд', 'Open actions menu')} onClick={() => void openCommands()}>＋</button>
             </div>
             <label className="chat-composer-label"><span className="chat-sr-only">{tr('Твоё сообщение', 'Your message')}</span><textarea ref={composerRef} value={draft} rows={1} maxLength={4000} placeholder={tr('Напиши что-нибудь…', 'Say something…')} onChange={e => { setDrafts(s => ({ ...s, [chatCode]: e.target.value })); e.target.style.height = 'auto'; e.target.style.height = `${Math.min(e.target.scrollHeight, 132)}px`; }} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && matchMedia('(pointer: fine)').matches) { e.preventDefault(); send(draft); } }} /></label>
@@ -412,7 +421,7 @@ export function ChatView(props: ChatViewProps) {
         </div>
       </>}
     </main>
-    {videoOffers&&<Sheet title={tr('Оживить фото','Animate photo')} onClose={()=>setVideoOffers(null)}>{videoOffers.products.length?videoOffers.products.map(p=><button className="account-offer" key={p.sku} onClick={()=>{const mediaId=videoOffers.mediaId;setVideoOffers(null);openPurchase(p.sku,p.kind==='subscription'?undefined:mediaId,p.upgrade?'upgrade':undefined,p.kind==='subscription'?mediaId:undefined);}}><span><strong>{p.title}</strong><small>{p.description}</small></span><span>{p.upgrade?.price.amount??p.price?.amount} {p.upgrade?.price.currency??p.price?.currency} ↗</span></button>):<p>{tr('Сейчас нет доступных предложений.','There are no available offers right now.')}</p>}</Sheet>}
+    {videoOffers&&<Sheet title={tr('Оживить фото','Animate photo')} onClose={()=>setVideoOffers(null)}>{videoOffers.products.length?videoOffers.products.map(p=><button className="account-offer" key={p.sku} onClick={()=>{const mediaId=videoOffers.mediaId;setVideoOffers(null);openPurchase(p.sku,p.feature_key==='video_unlock'||p.feature_key==='video_pass'?mediaId:undefined,p.upgrade?'upgrade':undefined,p.kind==='subscription'?mediaId:undefined);}}><span><strong>{p.title}</strong><small>{p.description}</small></span><span><OfferPrice product={p}/> ↗</span></button>):<p>{tr('Сейчас нет доступных предложений.','There are no available offers right now.')}</p>}</Sheet>}
     <dialog className="chat-dialog" ref={resetRef} onCancel={() => setResetOpen(false)} onClick={e => { if (e.target === e.currentTarget) setResetOpen(false); }}>
       <div className="chat-dialog-content"><div className="chat-dialog-title"><h2>{tr('Новая сцена', 'A new scene')}</h2><button className="chat-icon" onClick={() => setResetOpen(false)} aria-label={tr('Закрыть', 'Close')}>×</button></div><p>{tr('Начни заново с тем же персонажем. Переписка останется в истории.', 'Start again with the same character. Your messages stay in history.')}</p><div className="chat-reset-modes">{(['fast', 'roleplay'] as const).map(mode => <button key={mode} disabled={resetBusy} onClick={() => void resetScene(mode)}>{mode === 'fast' ? 'Fast' : 'Roleplay'}<span>{tr('Начать новую сцену', 'Start a new scene')}</span></button>)}</div><button className="chat-continue" onClick={() => setResetOpen(false)}>{tr('Хочу продолжить текущий диалог', 'Continue this conversation')}</button></div>
     </dialog>

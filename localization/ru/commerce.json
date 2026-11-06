@@ -52,8 +52,12 @@
       "description": "Одно видео для выбранной фотографии. Полученное видеосообщение остаётся в истории для повторного просмотра."
     },
     "video_pass": {
-      "title": "VideoPass",
-      "description": "Безлимитные новые видео в текущей сцене этого чата. Уже полученные видео остаются в истории после смены сцены."
+      "title": "VideoPass · вся сцена + видео",
+      "description": "Безлимит сообщений, бесплатные фотографии и безлимитные видео в текущей сцене этого чата."
+    },
+    "scene_unlock_upgrade": {
+      "title": "Улучшить до VideoPass",
+      "description": "Сцена уже открыта. Добавь безлимитные видео по специальной цене."
     }
   },
   "Purchase": "Покупка",
@@ -71,5 +75,7 @@
   "You can close this window. Your purchase status will be saved.": "Можно закрыть это окно. Статус покупки сохранится.",
   "You’re all set": "Всё готово",
   "Your benefits have been updated.": "Возможности обновлены.",
-  "Your unfinished request is saved. Checking again does not create a second purchase.": "Незавершённый запрос сохранён. Повторная проверка не создаёт вторую покупку."
+  "Your unfinished request is saved. Checking again does not create a second purchase.": "Незавершённый запрос сохранён. Повторная проверка не создаёт вторую покупку.",
+  "Discount": "Скидка",
+  "Original price": "Исходная цена"
 }

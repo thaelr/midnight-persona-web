@@ -52,8 +52,12 @@
       "description": "One video for the selected photo. The delivered video message stays in your history to watch again."
     },
     "video_pass": {
-      "title": "VideoPass",
-      "description": "Unlimited new videos in this chat’s current scene. Delivered videos stay in your history after the scene changes."
+      "title": "VideoPass · full scene + video",
+      "description": "Unlimited messages, free photos, and unlimited videos in this chat's current scene."
+    },
+    "scene_unlock_upgrade": {
+      "title": "Upgrade to VideoPass",
+      "description": "Your scene is already unlocked. Add unlimited videos at a special price."
     }
   },
   "Purchase": "Purchase",
@@ -71,5 +75,7 @@
   "You can close this window. Your purchase status will be saved.": "You can close this window. Your purchase status will be saved.",
   "You’re all set": "You’re all set",
   "Your benefits have been updated.": "Your benefits have been updated.",
-  "Your unfinished request is saved. Checking again does not create a second purchase.": "Your unfinished request is saved. Checking again does not create a second purchase."
+  "Your unfinished request is saved. Checking again does not create a second purchase.": "Your unfinished request is saved. Checking again does not create a second purchase.",
+  "Discount": "Discount",
+  "Original price": "Original price"
 }

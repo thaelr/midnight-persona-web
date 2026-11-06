@@ -865,6 +865,10 @@ export interface components {
                 days: 30;
             };
             requires_chat: boolean;
+            /** @enum {string} */
+            purchase_variant?: "standard" | "scene_unlock_upgrade";
+            discount_percent?: number;
+            scene_session_id?: string | null;
         };
         Catalog: {
             products: components["schemas"]["Product"][];
@@ -908,6 +912,10 @@ export interface components {
             subscription_change?: "renew" | "upgrade";
             /** @description A second separately paid checkout for a consumed panel requires operator payment reconciliation; no duplicate delivery. */
             review_required?: boolean;
+            /** @enum {string} */
+            purchase_variant?: "standard" | "scene_unlock_upgrade";
+            discount_percent?: number;
+            original_price?: components["schemas"]["Money"] | null;
         };
         MediaAccess: {
             /** @constant */
@@ -931,6 +939,8 @@ export interface components {
             ready_at?: string | null;
             /** Format: uuid */
             panel_media_id?: string;
+            /** @description Stable ID of this photo panel in the owned chat and scene. */
+            panel_id?: string;
         };
         Gallery: {
             media: (components["schemas"]["MediaAccess"] | {
@@ -959,6 +969,8 @@ export interface components {
                 ready_at?: string | null;
                 /** Format: uuid */
                 panel_media_id?: string;
+                /** @description Stable ID of this photo panel in the owned chat and scene. */
+                panel_id?: string;
             })[];
             /** @description Unfinished Web deliveries in this chat, including previous scenes. Recover their existing IDs through the access endpoint; never create replacement purchases. */
             video_deliveries?: components["schemas"]["VideoDelivery"][];
@@ -1012,6 +1024,7 @@ export interface components {
             source_photo_reveal_at?: string | null;
             same_photo?: boolean | null;
             panel_id?: string | null;
+            scene_session_id?: string | null;
         };
         VideoDeliveredData: {
             id: string;

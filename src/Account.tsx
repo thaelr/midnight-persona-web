@@ -1,3 +1,4 @@
+import {OfferPrice} from './components/OfferPrice';
 import {CopyIcon} from './components/Icons';
 import {useServerQuery,queryClient,serverKey,ServerContext} from './lib/queries';
 import {setActivity} from './lib/activity';
@@ -197,8 +198,16 @@ function PurchaseContent({ gateway, request, onClose, notify, onComplete, langua
         if (!item || (item.requires_chat&&!request.chatCode)) throw new Error(t('Это предложение сейчас недоступно.', 'This offer is currently unavailable.'));
         setProduct(item);
         const key = `mp:purchase:${encodeURIComponent(config.apiBaseUrl)}:${me.user_id}:${request.chatCode??'account'}:${request.sku}:${request.mediaId ?? ''}:${request.subscriptionChange??'renew'}`;
-        setStorageKey(key);
-        const saved = readAttempt(key);
+        let attemptKey=item.feature_key==='video_pass'&&item.scene_session_id
+          ? `${key}:${item.scene_session_id}:${item.purchase_variant??'standard'}` : key;
+        // Finish an outstanding pre-v2.6 attempt before starting a new payment.
+        const prior=attemptKey!==key&&!readAttempt(attemptKey)?readAttempt(key):null;
+        if(prior&&!prior.finished){
+          const previous=prior.purchaseId?await readPurchase(prior.purchaseId):null;
+          if(!previous||!['fulfilled','failed','expired'].includes(previous.status))attemptKey=key;
+        }
+        setStorageKey(attemptKey);
+        const saved = readAttempt(attemptKey);
         setAttempt(saved);
         setProvider(saved?.provider ?? item.providers[0] ?? '');
         if (saved?.purchaseId) {
@@ -315,9 +324,9 @@ function PurchaseContent({ gateway, request, onClose, notify, onComplete, langua
   };
   let body: ReactNode;
   if (loading) body = <p role="status" className="account-hint">{t('Загружаем условия…', 'Loading the offer…')}</p>;
-  else if (finished) body = <div className="account-purchase-result"><span aria-hidden="true">✓</span><h3>{t('Всё готово', 'You’re all set')}</h3><p>{t('Возможности обновлены.', 'Your benefits have been updated.')}</p><button type="button" className="account-primary" onClick={onClose}>{t('Продолжить', 'Continue')}</button>{product?.kind !== 'photo' && <button type="button" disabled={busy} className="account-secondary" onClick={() => void startNewAttempt()}>{t('Новая покупка', 'New purchase')}</button>}</div>;
+  else if (finished) body = <div className="account-purchase-result"><span aria-hidden="true">✓</span><h3>{t('Всё готово', 'You’re all set')}</h3><p>{t('Возможности обновлены.', 'Your benefits have been updated.')}</p><button type="button" className="account-primary" onClick={onClose}>{t('Продолжить', 'Continue')}</button>{product?.kind !== 'photo' && product?.feature_key!=='video_pass' && <button type="button" disabled={busy} className="account-secondary" onClick={() => void startNewAttempt()}>{t('Новая покупка', 'New purchase')}</button>}</div>;
   else body = <>
-    {product && <><p className="account-purchase-description">{product.description}</p><div className="account-purchase-price"><span>{t('Стоимость', 'Price')}</span><strong>{priceText(purchase?.price ?? (request.subscriptionChange==='upgrade'?product.upgrade?.price??product.price:product.price))}</strong></div></>}
+    {product && <><p className="account-purchase-description">{product.description}</p><div className="account-purchase-price"><span>{t('Стоимость', 'Price')}</span><strong><OfferPrice product={purchase??product} price={purchase?.price??(request.subscriptionChange==='upgrade'?product.upgrade?.price??product.price:product.price)}/></strong></div></>}
     {purchase ? <>
       <p className="account-status" role="status"><span aria-hidden="true">◉</span>{status[purchase.status]}</p>
       {actionableCheckout && <a className="account-primary account-pay-link" href={checkout} target="_blank" rel="noopener noreferrer">{t('Перейти к оплате', 'Open checkout')} ↗</a>}
