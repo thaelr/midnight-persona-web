@@ -1,0 +1,155 @@
+Privacy Policy
+
+Last updated: September 4, 2026
+
+This Privacy Policy explains how Midnight Persona processes user information.
+
+Midnight Persona is a software service available through a Telegram bot and related interfaces. It allows users to chat with virtual AI characters and use other features offered by the Service.
+
+Support contact:
+
+https://t.me/Midnight_Persona_Support
+
+1. General Terms
+
+1.1. This Privacy Policy explains how information is collected, used, stored, shared, and protected when using Midnight Persona (the "Service").
+
+1.2. By using the Service, you confirm that you have read this Privacy Policy and agree to the processing of data necessary for the Service to operate.
+
+1.3. If you do not agree with this Privacy Policy, you must stop using the Service.
+
+1.4. The Service is intended only for users aged 18 or older.
+
+2. Information We May Process
+
+2.1. When you use the Service, we may automatically collect or process information you provide, including:
+
+- Your Telegram user ID;
+- Chat ID;
+- Username and other Telegram profile information available to the Service through Telegram;
+- Messages, commands, requests, settings, selected scenarios, and other actions within the Service;
+- Your conversation history with AI characters;
+- Information about your available features, subscriptions, limits, and access;
+- Payment information, including payment status, amount, currency or payment method, and transaction IDs;
+- Dates and times of your activities;
+- Technical information needed to operate the Service, maintain security, identify errors, and protect the Service;
+- Messages you send to customer support.
+
+2.2. The Service does not receive bank card details, banking app login credentials, CVV/CVC codes, or other sensitive payment details when payments are processed by a third-party payment provider.
+
+Such information is processed by the relevant bank, payment system, or payment provider under its own terms and privacy policies.
+
+2.3. You must not share another person's personal data through the Service unless you have a lawful basis for doing so.
+
+3. How We Use Information
+
+We may use information to:
+
+- Provide access to the Service and its features;
+- Generate AI responses and other results;
+- Save conversation history, conversation state, and user settings;
+- Manage subscriptions, usage limits, paid features, and transactions;
+- Process payments and confirm access to purchased features;
+- Provide customer support;
+- Detect errors and keep the Service running properly;
+- Prevent fraud, abuse, and violations of the Service rules;
+- Moderate user requests and maintain safety;
+- Comply with legal requirements;
+- Analyze and improve the Service.
+
+4. User Content
+
+4.1. To provide its features, the Service may process messages, requests, commands, settings, files, and other content that you choose to submit.
+
+4.2. This information may be sent to automated systems and technical providers when necessary to generate responses, operate the infrastructure, and provide the requested features.
+
+4.3. You are responsible for the content you submit. Do not share information through the Service if you do not want it to be processed by automated systems.
+
+5. Sharing Information with Third Parties
+
+5.1. We may share information with third parties only when necessary to operate the Service, including:
+
+- Telegram and related technical services;
+- Payment systems, banks, and payment providers;
+- Server and cloud infrastructure providers;
+- AI model providers and other software providers that process user requests;
+- Technical contractors involved in operating the Service;
+- Government authorities when required by applicable law.
+
+5.2. The Service does not sell users' personal data to third parties.
+
+5.3. Information is shared with technical providers only to the extent necessary to perform the relevant function.
+
+6. Payments
+
+6.1. Paid features of Midnight Persona may be purchased using Telegram Stars and/or other payment methods available in the Service.
+
+6.2. To track payments, the Service may receive and store information about the payment status, amount, selected plan or feature, transaction time, and payment ID.
+
+6.3. Your bank card details and other payment credentials may be processed directly by the payment provider without being shared with Midnight Persona.
+
+7. Data Storage
+
+7.1. We store data for as long as necessary to:
+
+- Maintain user accounts and operate the Service;
+- Provide purchased features;
+- Fulfill our obligations to users;
+- Maintain security and resolve disputes;
+- Comply with legal requirements.
+
+7.2. Some technical, payment, or account information may be retained after you stop using the Service if necessary to comply with legal requirements, verify transactions, protect the Service Provider's legal interests, or resolve disputes.
+
+7.3. Data that is no longer needed may be deleted or anonymized.
+
+8. Data Security
+
+8.1. The Service takes reasonable technical and organizational measures to protect information against unauthorized access, modification, disclosure, or destruction.
+
+8.2. However, no method of transmitting or storing information online can guarantee complete security.
+
+8.3. You are responsible for keeping your Telegram account and the devices you use to access the Service secure.
+
+9. Your Rights
+
+9.1. You may contact us to request information about the personal data processed by the Service.
+
+9.2. You may request the deletion of your data unless we need to retain it to fulfill our obligations, protect the Service Provider's legitimate interests, or comply with legal requirements.
+
+9.3. To request information about your data or ask for its deletion, contact support:
+
+https://t.me/Midnight_Persona_Support
+
+9.4. We may ask you to verify that you own the relevant Telegram account before processing your request.
+
+10. Third-Party Services
+
+10.1. Midnight Persona relies on third-party services, including Telegram, payment systems, banks, server infrastructure providers, and software technology providers.
+
+10.2. These services may independently process your information under their own terms and privacy policies.
+
+10.3. Midnight Persona does not control how independent third-party services process your information.
+
+11. Changes to This Privacy Policy
+
+11.1. We may update this Privacy Policy from time to time.
+
+11.2. The latest version will be available through the Telegram bot, a related website, or the Service interface.
+
+11.3. Changes take effect when published unless the updated Policy states otherwise.
+
+11.4. By continuing to use the Service after an updated Policy is published, you acknowledge that you have read the updated terms.
+
+12. Related Documents
+
+Use of Midnight Persona is also governed by the Midnight Persona Public Offer:
+
+https://telegra.ph/Publichnaya-oferta-Midnight-Persona-06-28
+
+When you purchase paid features, the terms of payment, access, refunds, and use of the Service are governed by the Public Offer and the terms of the specific offer shown to you before payment.
+
+13. Contact
+
+For questions about data processing, data deletion, or the Service:
+
+https://t.me/Midnight_Persona_Support
