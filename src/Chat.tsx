@@ -16,7 +16,7 @@ import type {Publication} from './lib/gateway';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { Gateway } from './lib/gateway';
-import type { Character, Chat, Message, WebEvent, Product, Gallery, QuickRepliesData } from './lib/types';
+import type { Character, Chat, Message, WebEvent, Product, Gallery, QuickRepliesData,VideoDelivery } from './lib/types';
 import './chat.css';
 
 export interface ChatViewProps {
@@ -27,6 +27,7 @@ export interface ChatViewProps {
   onOpenChat: (code: string) => void;
   onClose: () => void;
   notify: (message: string) => void;
+  onVideoStatus: (message: string | null) => void;
   onPurchase: (sku: string, chatCode: string, mediaId?: string,subscriptionChange?:'upgrade'|'renew',animateMediaId?:string) => void;
   onRefreshChats: () => void;
   language?: string;
@@ -40,10 +41,11 @@ type ThreadState = {
   messages: Message[]; nextBefore: string | null; loaded: boolean; loading: boolean; error: string | null;
   cursor: string; replayed: boolean; quick: QuickRepliesData | null; media: TimelineMedia[];
   gallery: Gallery['media']; operations: Record<string, { status: string; action: string }>;
+  videoDeliveries:VideoDelivery[];
   outgoing: Outgoing[]; unread: number;windowed:boolean;
 };
 const fresh = (): ThreadState => ({ messages: [], nextBefore: null, loaded: false, loading: false, error: null,
-  cursor: '0', replayed: false, quick: null, media: [], gallery: [], operations: {}, outgoing: [], unread: 0,windowed:false });
+  cursor: '0', replayed: false, quick: null, media: [], gallery: [], videoDeliveries:[],operations: {}, outgoing: [], unread: 0,windowed:false });
 const terminal = new Set(['completed', 'failed', 'stale']);
 const order = (a: Message, b: Message) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id);
 const mergeMessages = (left: Message[], right: Message[]) => [...new Map([...left, ...right].map(m => [m.id, m])).values()].sort(order);
@@ -68,7 +70,8 @@ function reconcileOutgoing(outgoing: Outgoing[], messages: Message[]): Outgoing[
 }
 
 export function ChatView(props: ChatViewProps) {
-  const { gateway, characters, chats, chatCode, onOpenChat, onClose, notify, onPurchase, onRefreshChats, language = 'ru', storageScope } = props;
+  const { gateway, characters, chats, chatCode, onOpenChat, onClose, notify, onVideoStatus, onPurchase, onRefreshChats, language = 'ru', storageScope } = props;
+  useEffect(()=>{onVideoStatus(null);return()=>onVideoStatus(null);},[chatCode,onVideoStatus]);
   const scope=useContext(ServerContext);
   const alive=useRef(true),readAbort=useRef(new AbortController());
   useEffect(()=>{alive.current=true;return()=>{alive.current=false;readAbort.current.abort();};},[]);
@@ -124,7 +127,7 @@ export function ChatView(props: ChatViewProps) {
 
   const pendingDeliveries=useRef(new Map<string,{readyAt:string;code:string}>());
   const refreshGallery = useCallback(async (code:string)=>{
-   try{const result=await queryClient.fetchQuery({queryKey:serverKey(scope.owner,language,'gallery',code),queryFn:({signal})=>gateway.gallery(code,signal),staleTime:0});if(!alive.current||activeRef.current!==code)return;update(code,s=>({...s,gallery:result.media}));for(const delivery of result.video_deliveries??[])pendingDeliveries.current.set(delivery.delivery_id,{readyAt:delivery.ready_at??new Date().toISOString(),code});}
+   try{const result=await queryClient.fetchQuery({queryKey:serverKey(scope.owner,language,'gallery',code),queryFn:({signal})=>gateway.gallery(code,signal),staleTime:0});if(!alive.current||activeRef.current!==code)return;update(code,s=>({...s,gallery:result.media,videoDeliveries:result.video_deliveries??[]}));for(const delivery of result.video_deliveries??[]){if(delivery.status!=='delivered')pendingDeliveries.current.set(delivery.delivery_id,{readyAt:delivery.ready_at??new Date().toISOString(),code});}}
    catch(error){if(error instanceof ApiError&&[401,403].includes(error.status))update(code,s=>({...s,gallery:[]}));reportError('chat','gallery',error);}
   },[gateway,update,scope.owner,language]);
 
@@ -162,7 +165,7 @@ export function ChatView(props: ChatViewProps) {
         const ids=Object.entries(state?.operations??{}).filter(([,v])=>!terminal.has(v.status)).map(([id])=>id).slice(0,50);
         const result=await gateway.events(code,{after:cursor,limit:100,...(ids.length?{operation_ids:ids.join(',')}:{})},readAbort.current.signal);
         if(stopped)return false;
-        for(const event of result.events){if(['media_offer','media_unlocked','video_delivered'].includes(event.type))refreshMedia=true;if(event.type==='video_delivered')refreshHistory=true;applyEvent(code,event,true);}
+        for(const event of result.events){if(['media_offer','media_unlocked','video_delivered'].includes(event.type))refreshMedia=true;if(event.type==='video_delivered'&&!event.data.requested_photo_uuid)refreshHistory=true;applyEvent(code,event,true);}
         for(const op of result.operations??[])applyEvent(code,{cursor:result.cursor,created_at:new Date().toISOString(),type:'operation_status',data:{...op,error_code:null}},true);
         update(code,s=>({...s,cursor:result.cursor,replayed:true,error:null}));
         if(result.events.length<100||result.cursor===cursor)break;
@@ -326,10 +329,10 @@ export function ChatView(props: ChatViewProps) {
       if(!state.animation_available){await refreshGallery(chatCode);return;}
       if(state.full_active||state.video_pass_active){
         const key=`${storagePrefix}.video.${chatCode}.${mediaId}`;let id=readStorage<string|null>(key,null);if(!id){id=crypto.randomUUID();writeStorage(key,id);}
-        const delivery=await gateway.requestVideo(chatCode,mediaId,id);try{await gateway.videoDelivery(delivery.delivery_id);}catch{/* eligible_at is enforced on the server. */}
+        const delivery=await gateway.requestVideo(chatCode,mediaId,id);onVideoStatus(delivery.same_photo===false?tr('Подготавливаем фото для оживления','Preparing a photo for animation'):tr('Оживляем фото','Animating photo'));
         await refreshGallery(chatCode);await loadHistory(chatCode);
       }else{const catalog=await queryClient.fetchQuery({queryKey:serverKey(scope.owner,language,'catalog',chatCode),queryFn:({signal})=>gateway.catalog(chatCode,signal),staleTime:15_000});setVideoOffers({mediaId,products:catalog.products.filter(p=>p.feature_key==='video_unlock'||p.feature_key==='video_pass'||p.subscription_tier==='full')});}
-    }catch{notify(tr('Не удалось запросить видео. Повтор использует ту же выдачу.','Could not request the video. Retrying uses the same delivery.'));}finally{setVideoBusy(null);}
+    }catch{onVideoStatus(null);notify(tr('Не удалось запросить видео. Повтор использует ту же выдачу.','Could not request the video. Retrying uses the same delivery.'));}finally{setVideoBusy(null);}
   }
   const readId=useRef<Record<string,string>>({});
   const markVisibleRead=useCallback(()=>{if(!chatCode||isSystem||document.visibilityState!=='visible'||!nearBottom.current)return;const last=threadsRef.current[chatCode]?.messages.at(-1);if(!last||readId.current[chatCode]===last.id)return;const code=chatCode;gateway.markRead(code,last.id).then(()=>{readId.current[code]=last.id;onRefreshChats();}).catch(()=>{});},[chatCode,isSystem,gateway,onRefreshChats]);
@@ -381,7 +384,7 @@ export function ChatView(props: ChatViewProps) {
               const access = current.gallery.find(m => m.media_id === mediaId);
               const photo = access?.unlocked ? safeImage(access.photo_url) : item.kind==='message'?safeImage(item.message.photo_url):undefined;
               return <article key={`media-${mediaId}`} className="chat-media">
-                <PhotoPanelCard gateway={gateway} chatCode={chatCode} sceneSessionId={chat?.scene_session_id??null} mediaId={mediaId} anchor={access?.panel_media_id} photoUrl={photo} access={access} gallery={current.gallery} storageScope={storagePrefix} videoBusy={videoBusy!==null} onOpen={(id,url,source)=>{setViewerExtras(old=>({...old,[id]:{id,url,createdAt:item.at}}));setLightbox({id,chatCode,source});}} onUnlock={unlock} onAnimate={id=>void animatePhoto(id)} onChanged={()=>void refreshGallery(chatCode)}/>
+                <PhotoPanelCard gateway={gateway} chatCode={chatCode} sceneSessionId={chat?.scene_session_id??null} mediaId={mediaId} anchor={access?.panel_media_id} photoUrl={photo} access={access} gallery={current.gallery} delivery={current.videoDeliveries.find(d=>d.requested_photo_uuid===mediaId)} storageScope={storagePrefix} videoBusy={videoBusy!==null} onVideoStatus={onVideoStatus} onOpen={(id,url,source)=>{setViewerExtras(old=>({...old,[id]:{id,url,createdAt:item.at}}));setLightbox({id,chatCode,source});}} onUnlock={unlock} onAnimate={id=>void animatePhoto(id)} onChanged={()=>void refreshGallery(chatCode)}/>
                 <time>{clock(item.at)}</time>
               </article>;
             })}

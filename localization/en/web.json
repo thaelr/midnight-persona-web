@@ -232,5 +232,10 @@
   "Your vote": "Your vote",
   "Could not load the photo.": "Could not load the photo.",
   "Loading photo…": "Loading photo…",
-  "Photo viewer": "Photo viewer"
+  "Photo viewer": "Photo viewer",
+  "Preparing a photo for animation": "Preparing a photo for animation",
+  "Animating photo": "Animating photo",
+  "The video could not be shown. Your photos are still available.": "The video could not be shown. Your photos are still available.",
+  "Previous item": "Previous item",
+  "Next item": "Next item"
 }

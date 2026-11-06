@@ -232,5 +232,10 @@
   "Your vote": "Твой голос",
   "Could not load the photo.": "Не удалось загрузить фотографию.",
   "Loading photo…": "Фотография загружается…",
-  "Photo viewer": "Просмотр фотографии"
+  "Photo viewer": "Просмотр фотографии",
+  "Preparing a photo for animation": "Подготавливаем фото для оживления",
+  "Animating photo": "Оживляем фото",
+  "The video could not be shown. Your photos are still available.": "Видео не удалось показать. Фотографии остались доступны.",
+  "Previous item": "Предыдущий элемент",
+  "Next item": "Следующий элемент"
 }

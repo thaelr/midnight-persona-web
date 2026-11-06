@@ -987,7 +987,7 @@ export interface components {
             scene_session_id: string | null;
             delivery?: components["schemas"]["VideoDelivery"];
         };
-        /** @description An owned delivery journal entry. Initial delivery becomes eligible at ready_at. Successful deliveries remain playable in chat history indefinitely, including after subscription/scene changes. Each access issues a fresh signed Storage URL valid for 120 seconds; its expiry does not expire the delivered message. An uncertain initial delivery is not automatically repeated. */
+        /** @description An owned delivery journal entry. Paired deliveries stay in their existing photo panel; legacy unpaired deliveries remain playable in chat history. Each access issues a fresh signed Storage URL valid for 120 seconds, including after subscription or scene changes. An uncertain initial delivery is not automatically repeated. */
         VideoDelivery: {
             /** Format: uuid */
             delivery_id: string;
@@ -1002,6 +1002,16 @@ export interface components {
             video_url?: string;
             /** Format: date-time */
             expires_at?: string;
+            /** Format: uuid */
+            requested_photo_uuid?: string | null;
+            /** Format: uuid */
+            source_photo_uuid?: string | null;
+            /** Format: uri */
+            source_photo_url?: string | null;
+            /** Format: date-time */
+            source_photo_reveal_at?: string | null;
+            same_photo?: boolean | null;
+            panel_id?: string | null;
         };
         VideoDeliveredData: {
             id: string;
@@ -1017,6 +1027,11 @@ export interface components {
             scene_session_id: string;
             /** Format: date-time */
             created_at: string;
+            panel_id?: string | null;
+            /** Format: uuid */
+            requested_photo_uuid?: string | null;
+            /** Format: uuid */
+            source_photo_uuid?: string | null;
         };
         LanguageOption: {
             locale: string;
