@@ -180,6 +180,14 @@ function PurchaseContent({ gateway, request, onClose, notify, onComplete, langua
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [finished, setFinished] = useState(false);
+  const [renewableReceipt,setRenewableReceipt]=useState(false);
+  const sceneProduct=(item:Product|null)=>item?.feature_key==='scene_unlock'||item?.feature_key==='video_pass';
+  const offeredAgain=async(item:Product)=>{
+    if(!request.chatCode||!sceneProduct(item))return false;
+    const latest=await gateway.catalog(request.chatCode);
+    return latest.products.some(next=>next.sku===item.sku && next.scene_session_id===item.scene_session_id &&
+      next.purchase_variant===item.purchase_variant && next.providers.length>0);
+  };
   const [freeOperationPending, setFreeOperationPending] = useState(false);
   const announced = useRef(false);
   const submitting = useRef(false);
@@ -212,8 +220,12 @@ function PurchaseContent({ gateway, request, onClose, notify, onComplete, langua
         setProvider(saved?.provider ?? item.providers[0] ?? '');
         if (saved?.purchaseId) {
           const existing = await readPurchase(saved.purchaseId);
-          if (live) setPurchase(existing);
-        } else if (saved?.finished && live) setFinished(true);
+          const canRenew=existing.status==='fulfilled' && await offeredAgain(item);
+          if (live) { setRenewableReceipt(canRenew); setPurchase(existing); }
+        } else if (saved?.finished && live) {
+          const canRenew=await offeredAgain(item);
+          if(live){setRenewableReceipt(canRenew);setFinished(true);}
+        }
         else if (saved?.pendingFeature && live) setFreeOperationPending(true);
       } catch (error) { if (live) setError(message(error, t('Не удалось загрузить предложение.', 'Could not load this offer.'))); }
       finally { if (live) setLoading(false); }
@@ -236,7 +248,12 @@ function PurchaseContent({ gateway, request, onClose, notify, onComplete, langua
     let live=true;const stop=startPolling(async()=>{const updated=await readPurchase(purchase.purchase_id);if(live){setPurchase(updated);setError('');}return true;},error=>{if(live)setError(message(error,t('Не удалось обновить статус. Проверяем ещё раз…','Could not update the status. Checking again…')));});return()=>{live=false;stop();};
   }, [gateway, purchase?.purchase_id, purchase?.status, storageKey, attempt?.clientMessageId]);
 
-  const submitFree = async () => {if(submitting.current||!storageKey||!product)return;submitting.current=true;setBusy(true);try{const key=storageKey+':redeem';let id=localStorage.getItem(key);if(!id){id=crypto.randomUUID();localStorage.setItem(key,id);}const result=await gateway.createPurchase({client_message_id:id,...(request.chatCode?{chat_code:request.chatCode}:{}),sku:request.sku,...(request.mediaId?{media_id:request.mediaId}:{})});if('available'in result&&result.available){setFinished(result.fulfilled);setFreeOperationPending(!result.fulfilled);callbacks.current.onComplete();callbacks.current.notify(t('Действие принято','Action accepted'));}}catch(e){setError(e instanceof ApiError&&e.status===402?t('Бесплатного бонуса нет. Выбери способ оплаты.','No free benefit is available. Choose a payment method.'):t('Не удалось использовать бонус.','Could not use this benefit.'));}finally{submitting.current=false;setBusy(false);}};
+  const submitFree = async () => {if(submitting.current||!storageKey||!product)return;submitting.current=true;setBusy(true);try{const key=storageKey+':redeem';let id=localStorage.getItem(key);if(!id){id=crypto.randomUUID();localStorage.setItem(key,id);}const result=await gateway.createPurchase({client_message_id:id,...(request.chatCode?{chat_code:request.chatCode}:{}),sku:request.sku,...(request.mediaId?{media_id:request.mediaId}:{})});if('available'in result&&result.available){
+      if(result.fulfilled&&product.feature_key==='scene_unlock'){
+        if(localStorage.getItem(key)===id)localStorage.removeItem(key);
+        setRenewableReceipt(await offeredAgain(product));
+      }
+      setFinished(result.fulfilled);setFreeOperationPending(!result.fulfilled);callbacks.current.onComplete();callbacks.current.notify(t('Действие принято','Action accepted'));}}catch(e){setError(e instanceof ApiError&&e.status===402?t('Бесплатного бонуса нет. Выбери способ оплаты.','No free benefit is available. Choose a payment method.'):t('Не удалось использовать бонус.','Could not use this benefit.'));}finally{submitting.current=false;setBusy(false);}};
   const submit = async () => {
     if (submitting.current || !product || !storageKey || purchase || finished) return;
     submitting.current = true;
@@ -315,8 +332,11 @@ function PurchaseContent({ gateway, request, onClose, notify, onComplete, langua
             throw new Error(t('Текущая покупка ещё выполняется.', 'The current purchase is still in progress.'));
           }
         } else if (latest && !latest.finished) throw new Error(t('Сначала нужно проверить предыдущий запрос.', 'Check the previous request first.'));
+        if(sceneProduct(product) && finished && (!product || !await offeredAgain(product))) {
+          setRenewableReceipt(false);throw new Error(t('Это предложение сейчас недоступно.', 'This offer is currently unavailable.'));
+        }
         localStorage.removeItem(storageKey);
-        setAttempt(null); setPurchase(null); setFinished(false); setFreeOperationPending(false); setError('');
+        setRenewableReceipt(false);setAttempt(null); setPurchase(null); setFinished(false); setFreeOperationPending(false); setError('');
         announced.current = false;
       });
     } catch (error) { setError(message(error, t('Не удалось подготовить новую покупку.', 'Could not prepare a new purchase.'))); }
@@ -324,7 +344,7 @@ function PurchaseContent({ gateway, request, onClose, notify, onComplete, langua
   };
   let body: ReactNode;
   if (loading) body = <p role="status" className="account-hint">{t('Загружаем условия…', 'Loading the offer…')}</p>;
-  else if (finished) body = <div className="account-purchase-result"><span aria-hidden="true">✓</span><h3>{t('Всё готово', 'You’re all set')}</h3><p>{t('Возможности обновлены.', 'Your benefits have been updated.')}</p><button type="button" className="account-primary" onClick={onClose}>{t('Продолжить', 'Continue')}</button>{product?.kind !== 'photo' && product?.feature_key!=='video_pass' && <button type="button" disabled={busy} className="account-secondary" onClick={() => void startNewAttempt()}>{t('Новая покупка', 'New purchase')}</button>}</div>;
+  else if (finished) body = <div className="account-purchase-result"><span aria-hidden="true">✓</span><h3>{t('Всё готово', 'You’re all set')}</h3><p>{t('Возможности обновлены.', 'Your benefits have been updated.')}</p><button type="button" className="account-primary" onClick={onClose}>{t('Продолжить', 'Continue')}</button>{product?.kind !== 'photo' && (!sceneProduct(product)||renewableReceipt) && <button type="button" disabled={busy} className="account-secondary" onClick={() => void startNewAttempt()}>{t('Новая покупка', 'New purchase')}</button>}</div>;
   else body = <>
     {product && <><p className="account-purchase-description">{product.description}</p><div className="account-purchase-price"><span>{t('Стоимость', 'Price')}</span><strong><OfferPrice product={purchase??product} price={purchase?.price??(request.subscriptionChange==='upgrade'?product.upgrade?.price??product.price:product.price)}/></strong></div></>}
     {purchase ? <>

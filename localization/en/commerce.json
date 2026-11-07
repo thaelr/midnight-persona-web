@@ -40,8 +40,8 @@
       "description": "Unlock the photo in this conversation."
     },
     "scene_unlock": {
-      "title": "Unlock scene",
-      "description": "Unlock access to the current scene."
+      "title": "Chat with photos for {days} days",
+      "description": "Unlimited messages and free photos in this chat’s current scene for {days} days."
     },
     "fast_scene_skip": {
       "title": "Skip Fast scene",
@@ -52,12 +52,13 @@
       "description": "One video for the selected photo. The delivered video message stays in your history to watch again."
     },
     "video_pass": {
-      "title": "VideoPass · full scene + video",
-      "description": "Unlimited messages, free photos, and unlimited videos in this chat's current scene."
+      "title": "Chat with photos and videos for {days} days",
+      "description": "Unlimited messages, free photos and available videos in this chat’s current scene for {days} days."
     },
     "scene_unlock_upgrade": {
-      "title": "Upgrade to VideoPass",
-      "description": "Your scene is already unlocked. Add unlimited videos at a special price."
+      "title": "Add videos to this chat for {days} days",
+      "description": "Add available videos to your unlocked scene at a special price for {days} days.",
+      "discount_format": "{original} → {final} ({percent}% off)"
     }
   },
   "Purchase": "Purchase",

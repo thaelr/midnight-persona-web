@@ -3,20 +3,20 @@
     "base": {"title":"Base · {days} дней","description":"Возможности Base согласно действующим условиям подписки."},
     "full": {"title":"Full · {days} дней","description":"Возможности Base и безлимитные новые видео во всех чатах. Уже полученные видео остаются в истории."},
     "photo": {"title":"Открыть фотографию","description":"Открой фотографию в этом диалоге."},
-    "scene_unlock": {"title":"Разблокировать сцену","description":"Открой доступ к текущей сцене."},
+    "scene_unlock": {"title":"Чат с фото на {days} дней","description":"Безлимит сообщений и бесплатные фотографии в текущей сцене этого чата на {days} дней."},
     "fast_scene_skip": {"title":"Пропустить сцену Fast","description":"Перейди к следующей сцене Fast."},
     "video_unlock": {"title":"Оживить фото","description":"Одно видео для выбранной фотографии. Полученное видеосообщение остаётся в истории для повторного просмотра."},
-    "video_pass": {"title":"VideoPass · вся сцена + видео","description":"Безлимит сообщений, бесплатные фотографии и безлимитные видео в текущей сцене этого чата."},
-    "scene_unlock_upgrade": {"title":"Улучшить до VideoPass","description":"Сцена уже открыта. Добавь безлимитные видео по специальной цене."}
+    "video_pass": {"title":"Чат с фото и видео на {days} дней","description":"Безлимит сообщений, бесплатные фотографии и доступные видео в текущей сцене этого чата на {days} дней."},
+    "scene_unlock_upgrade": {"title":"Добавить видео в чат на {days} дней","description":"Добавь доступные видео в уже открытую сцену по специальной цене на {days} дней.","discount_format":"{original} → {final} (скидка {percent}%)"}
   },
   "en": {
     "base": {"title":"Base · {days} days","description":"Base benefits under the current subscription terms."},
     "full": {"title":"Full · {days} days","description":"Base benefits and unlimited new videos in every chat. Delivered videos stay in your history."},
     "photo": {"title":"Unlock photo","description":"Unlock the photo in this conversation."},
-    "scene_unlock": {"title":"Unlock scene","description":"Unlock access to the current scene."},
+    "scene_unlock": {"title":"Chat with photos for {days} days","description":"Unlimited messages and free photos in this chat’s current scene for {days} days."},
     "fast_scene_skip": {"title":"Skip Fast scene","description":"Continue to the next Fast scene."},
     "video_unlock": {"title":"Animate photo","description":"One video for the selected photo. The delivered video message stays in your history to watch again."},
-    "video_pass": {"title":"VideoPass · full scene + video","description":"Unlimited messages, free photos, and unlimited videos in this chat's current scene."},
-    "scene_unlock_upgrade": {"title":"Upgrade to VideoPass","description":"Your scene is already unlocked. Add unlimited videos at a special price."}
+    "video_pass": {"title":"Chat with photos and videos for {days} days","description":"Unlimited messages, free photos and available videos in this chat’s current scene for {days} days."},
+    "scene_unlock_upgrade": {"title":"Add videos to this chat for {days} days","description":"Add available videos to your unlocked scene at a special price for {days} days.","discount_format":"{original} → {final} ({percent}% off)"}
   }
 }

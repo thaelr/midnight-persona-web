@@ -1,5 +1,5 @@
 import {test,expect} from '@playwright/test';
-import {chat,mockApp} from './fixtures';
+import {chat,mockApp,userId} from './fixtures';
 for(const status of [404,503])test(`A01 dictionary ${status} leaves all configured sign-in choices available`,async({context,page})=>{
  await mockApp(context,{session:false,localizationStatus:status});await page.goto('/');
  for(const name of ['Continue with Telegram','Continue with Google','Continue as a guest'])await expect(page.getByRole('button',{name})).toBeEnabled();
@@ -113,4 +113,33 @@ test('VideoPass panel keeps the selected photo, its paired video and one card af
   await prev.click();await visiblePhoto(photos[0]);
   await expect(card.getByRole('button',{name:/More photos|Animate photo/})).toHaveCount(0);expect(requests).toBe(1);
  }
+});
+
+for(const feature of ['scene_unlock','video_pass'])test(`an offered ${feature} can renew a saved receipt once; a newly active grant cannot`,async({context,page})=>{
+ await mockApp(context);
+ const sku='renew-'+feature,old='00000000-0000-4000-8000-000000001201',next='00000000-0000-4000-8000-000000001202';
+ const product={sku,kind:'feature',feature_key:feature,title:'Available scene purchase',description:'Fixture',
+   requires_chat:true,providers:['test'],price:{amount:'10',currency:'RUB'},scene_session_id:'scene1',
+   ...(feature==='video_pass'?{purchase_variant:'standard'}:{})};
+ const key=`mp:purchase:${encodeURIComponent('https://gateway.test')}:${userId}:chat1:${sku}::renew`+
+   (feature==='video_pass'?':scene1:standard':'');
+ await context.addInitScript(({key,old})=>localStorage.setItem(key,JSON.stringify({clientMessageId:'previous-attempt',provider:'test',purchaseId:old})),{key,old});
+ let offered=true;const posts:string[]=[];
+ await context.route('**/web/commerce/catalog*',r=>r.fulfill({json:{products:offered?[product]:[],providers:['test'],pricing_requires_chat:false}}));
+ await context.route('**/web/commerce/purchases**',r=>{
+   const req=r.request(),create=req.method()==='POST';
+   if(create){posts.push(req.postDataJSON().client_message_id);offered=false;}
+   return r.fulfill({json:{purchase_id:create?next:req.url().split('/').at(-1),status:'fulfilled',kind:'feature',sku,provider:'test',price:product.price,
+     checkout_url:null,media_id:null,created_at:'2026-11-01T00:00:00Z',updated_at:'2026-11-01T00:00:00Z'}});
+ });
+ await page.goto('/#chats/chat1');
+ await page.getByRole('button',{name:'Open actions menu'}).click();
+ await page.getByRole('button',{name:/Available scene purchase/}).click();
+ await expect(page.getByRole('button',{name:'New purchase'})).toBeVisible();
+ expect(posts).toEqual([]);
+ await page.getByRole('button',{name:'New purchase'}).click();
+ await page.getByRole('button',{name:'Confirm purchase'}).click();
+ await expect(page.getByRole('heading',{name:'You’re all set'})).toBeVisible();
+ await expect(page.getByRole('button',{name:'New purchase'})).toHaveCount(0);
+ expect(posts).toHaveLength(1);expect(posts[0]).not.toBe('previous-attempt');
 });
