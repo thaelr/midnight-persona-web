@@ -1,5 +1,5 @@
-export type AppConfig = {apiBaseUrl:string;supabaseUrl:string;supabasePublishableKey:string;introVideo:string;ambientVideo:string;termsUrl:string;privacyUrl:string;supportTelegram:string;supportEmail:string;faqUrl:string;telegramAuthProvider:string};
-export let config:AppConfig={apiBaseUrl:'',supabaseUrl:'',supabasePublishableKey:'',introVideo:'',ambientVideo:'',termsUrl:'',privacyUrl:'',supportTelegram:'',supportEmail:'',faqUrl:'',telegramAuthProvider:''};
+export type AppConfig = {apiBaseUrl:string;supabaseUrl:string;supabasePublishableKey:string;introVideo:string;introVideoMobile:string;ambientVideo:string;ambientVideoMobile:string;termsUrl:string;privacyUrl:string;supportTelegram:string;supportEmail:string;faqUrl:string;telegramAuthProvider:string};
+export let config:AppConfig={apiBaseUrl:'',supabaseUrl:'',supabasePublishableKey:'',introVideo:'',introVideoMobile:'',ambientVideo:'',ambientVideoMobile:'',termsUrl:'',privacyUrl:'',supportTelegram:'',supportEmail:'',faqUrl:'',telegramAuthProvider:''};
 export async function loadConfig(){
   const response=await fetch('/config.json',{cache:'no-store'});
   if(!response.ok)throw new Error('Не удалось загрузить настройки приложения.');
