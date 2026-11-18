@@ -16,22 +16,20 @@ type WelcomeScreenProps={
  entering:boolean;
  enterAvailable:boolean;
  error:string;
- adult:boolean;
- agreed:boolean;
+ consentChecked:boolean;
  legalReady:boolean;
  onEnter:()=>void;
  onEnterSettled:()=>void;
  onLanguage:(locale:string)=>void;
  onConsent:()=>void;
- onAdult:(value:boolean)=>void;
- onAgreed:(value:boolean)=>void;
+ onConsentChange:(value:boolean)=>void;
  onPreview:()=>void;
 };
 
 const ENTER_DURATION=400;
 
 /** Presentation only: session, consent, language and routing stay in App. */
-export function WelcomeScreen({step,status,languages,language,busy,entering,enterAvailable,error,adult,agreed,legalReady,onEnter,onEnterSettled,onLanguage,onConsent,onAdult,onAgreed,onPreview}:WelcomeScreenProps){
+export function WelcomeScreen({step,status,languages,language,busy,entering,enterAvailable,error,consentChecked,legalReady,onEnter,onEnterSettled,onLanguage,onConsent,onConsentChange,onPreview}:WelcomeScreenProps){
  const t=useCopy(),reduce=useReducedMotion()??false;
  const [glitching,setGlitching]=useState(false);
  const busyRef=useRef(false),timer=useRef<number|undefined>(undefined);
@@ -50,22 +48,22 @@ export function WelcomeScreen({step,status,languages,language,busy,entering,ente
   <div className="welcome-stage">
    {status?<div className="welcome-status">{status}</div>:<AnimatePresence mode="wait" initial={false}>
     {step==='invitation'&&<motion.div key="invitation" initial={{opacity:0}} animate={{opacity:1,transition:enterTransition}} exit={{opacity:0,transition:exitTransition}} className="welcome-step invitation">
-     <h1 className="welcome-name" aria-label="Midnight Persona"><span className="welcome-name-inner">MIDNIGHT PERSONA</span></h1>
+     <h1 className="welcome-name" aria-label="Midnight Persona"><span className="welcome-name-inner"><img src="/assets/midnight-persona.svg" alt=""/></span></h1>
      <button type="button" className={`enter ${glitching?'is-glitching':''}`} data-motion-press aria-busy={entering||glitching} disabled={!enterAvailable} onClick={enter}><span className="enter-text">ENTER</span></button>
-     {legalLinks}
      {!enterAvailable&&<button type="button" className="text-button preview-button" onClick={onPreview}>{t("Посмотреть интерфейс","Explore the interface")}<Icon name="arrow" size={16}/></button>}
     </motion.div>}
-    {step==='language'&&<motion.div key="language" initial={{opacity:0}} animate={{opacity:1,transition:enterTransition}} exit={{opacity:0,transition:exitTransition}} className="welcome-step">
-     <h2 className="welcome-step-title">{t("На каком языке?","Your language?")}</h2>
-     <div className="language-options">{languages.map(l=><button key={l.locale} type="button" className="button secondary" disabled={busy} aria-pressed={language===l.locale} onClick={()=>onLanguage(l.locale)}>{l.display_name}</button>)}</div>
+    {step==='language'&&<motion.div key="language" initial={{opacity:0}} animate={{opacity:1,transition:enterTransition}} exit={{opacity:0,transition:exitTransition}} className="welcome-step language-step">
+     <div className="language-options">{languages.map(l=><button key={l.locale} type="button" lang={l.locale} className="language-option" disabled={busy} aria-pressed={language===l.locale} onClick={()=>onLanguage(l.locale)}><span>{l.display_name}</span></button>)}</div>
     </motion.div>}
     {step==='consent'&&<motion.div key="consent" initial={{opacity:0}} animate={{opacity:1,transition:enterTransition}} exit={{opacity:0,transition:exitTransition}} className="welcome-step">
-     <h2 className="welcome-step-title">{t("Прежде чем познакомимся","Before we meet")}</h2>
      <div className="consent-checks">
-      <label className="check-row"><input type="checkbox" checked={adult} onChange={e=>onAdult(e.target.checked)}/><span>{t("Мне исполнилось 18 лет","I am 18 or older")}</span></label>
-      <label className="check-row"><input type="checkbox" checked={agreed} onChange={e=>onAgreed(e.target.checked)}/><span>{t("Я принимаю условия сервиса и политику конфиденциальности","I accept the terms and privacy policy")}</span></label>
+      <label className="check-row">
+       <input type="checkbox" checked={consentChecked} onChange={e=>onConsentChange(e.target.checked)}/>
+       <span className="consent-box" aria-hidden="true"><img src="/assets/consent-cross.svg" alt=""/></span>
+       <span>{t("Мне есть 18 лет, и я принимаю условия сервиса.","I'm 18 or older and agree to the Terms of Service.")}</span>
+      </label>
      </div>
-     <button type="button" className="button primary" disabled={!adult||!agreed||!legalReady||busy} onClick={onConsent}>{t("Войти в историю","Let the story begin")}<Icon name="arrow"/></button>
+     <button type="button" className="continue-button" disabled={!consentChecked||!legalReady||busy} onClick={onConsent}><span>BEGIN</span></button>
      {!legalReady&&<p className="welcome-note" role="status">{t("Владелец ещё не добавил утверждённые тексты документов.","The owner has not added the approved documents yet.")}</p>}
      {legalLinks}
     </motion.div>}
