@@ -31,3 +31,55 @@ body{-webkit-font-smoothing:antialiased}
  .app-content{height:calc(100dvh - 156px)}.preview-banner+.app-content,.preview-banner~.app-content{height:calc(100dvh - 192px)}.main-nav{background:var(--surface-navigation-mobile)}.main-nav button{font-size:10px}
  .empty-view h1{font-size:34px;line-height:1.2}.detail-copy{background:linear-gradient(transparent 25%,var(--bg) 80%)}.immersive .app-content{height:100dvh}
 }
+
+/* Catalogue shell: the moon is the only header gesture, navigation is plain text. */
+.app-header{height:88px;padding:20px max(32px,4.2vw);border:0;background:none;backdrop-filter:none;-webkit-backdrop-filter:none;z-index:5}
+.brand-mark{position:relative;display:inline-flex;align-items:center;width:36px;height:36px;flex-shrink:0;padding:0;border:0;background:none;color:var(--paper)}
+.brand-mark::after{content:'';position:absolute;inset:-7px;z-index:3}
+.brand-moon{position:relative;z-index:2;display:block;width:100%;height:100%;transform-origin:center;transition:transform .4s var(--ease)}
+.brand-moon img{display:block;width:100%;height:100%}
+.brand-wordmark{position:absolute;left:calc(100% - 9px);top:50%;z-index:1;translate:0 -50%;width:min(42vw,300px);pointer-events:none;clip-path:inset(-10% 100% -10% 0);transition:clip-path .4s var(--ease)}
+.brand-wordmark img{display:block;width:100%;height:auto}
+@media(hover:hover) and (pointer:fine){
+ .brand-mark:hover .brand-moon,.brand-mark:focus-visible .brand-moon{transform:scale(1.18)}
+ .brand-mark:hover .brand-wordmark,.brand-mark:focus-visible .brand-wordmark{clip-path:inset(-10% 0 -10% 0)}
+}
+.brand-mark.is-open .brand-moon{transform:scale(1.18)}
+.brand-mark.is-open .brand-wordmark{clip-path:inset(-10% 0 -10% 0)}
+.header-right{gap:0}
+.language-switch{padding:8px 0;border:0;border-radius:0;background:none;color:var(--text-secondary);font-size:12px;letter-spacing:.08em;transition:color var(--duration-feedback) var(--ease)}
+.language-switch:hover,.language-switch:focus-visible{color:var(--paper)}
+
+.section-heading{display:block;padding:8px 28px 0}
+.section-heading h1{font-weight:400;letter-spacing:-.02em;margin-top:0;color:var(--paper)}
+
+.main-nav{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:30px;padding:0;border:0;border-radius:0;background:none;backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:none;z-index:10}
+.main-nav button{position:relative;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;flex-direction:row;gap:0;min-height:44px;padding:10px 0 14px;border-radius:0;color:var(--text-secondary);font-size:13px;font-weight:400;letter-spacing:.04em;line-height:1.4;transition:color 300ms ease}
+.main-nav button.active{color:var(--accent)}
+.main-nav button.active:before{content:none;display:none}
+.main-nav button>span{position:relative;display:inline-block}
+.main-nav button>span:before,.main-nav button>span:after{content:'';position:absolute;left:0;width:100%;height:1px;background:currentColor;pointer-events:none;transition:transform 300ms ease}
+.main-nav button>span:before{top:100%;transform-origin:0 50%;transform:scale3d(0,1,1)}
+.main-nav button>span:after{top:calc(100% + 4px);transform-origin:100% 50%}
+@media(hover:hover) and (pointer:fine){
+ .main-nav button:not(.active):hover{color:var(--paper)}
+ .main-nav button:not(.active):hover>span:before{transform:scale3d(1,1,1)}
+ .main-nav button:not(.active):hover>span:after{transform:scale3d(0,1,1)}
+}
+.main-nav button:focus-visible{color:var(--paper)}
+.main-nav button.active>span:before,.main-nav button.active>span:after{content:none}
+.main-nav button i{position:absolute;left:0;bottom:11px;width:100%;height:1px;border-radius:0;background:var(--accent)}
+
+@media(max-width:600px){
+ .app-header{height:72px;padding:17px 20px}
+ .brand-mark{width:32px;height:32px}
+ .brand-wordmark{left:calc(100% - 8px);width:min(58vw,220px)}
+ .language-switch{padding:6px 0;font-size:11px}
+ .main-nav{bottom:calc(18px + env(safe-area-inset-bottom));gap:24px}
+ .main-nav button{min-height:44px;padding:10px 0 14px;font-size:13px}
+ .section-heading{padding:20px 25px 0}
+ .section-heading h1{font-size:29px;letter-spacing:-.02em;margin-top:0}
+}
+@media(min-width:1600px){
+ .app-header{padding-inline:max(64px,calc((100vw - 1400px)/2))}
+}
