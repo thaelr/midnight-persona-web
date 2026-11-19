@@ -1,6 +1,6 @@
 import {useCopy} from './lib/localization';
 import {useEffect,useLayoutEffect,useState,useRef,useCallback,type ReactNode,type PointerEvent as ReactPointerEvent} from 'react';
-import {motion,AnimatePresence,LayoutGroup,animate,useMotionValue,useMotionValueEvent,useTransform,useReducedMotion,useIsPresent,type MotionValue,type PanInfo} from 'motion/react';
+import {motion,AnimatePresence,LayoutGroup,animate,useMotionValue,useMotionValueEvent,useTransform,useReducedMotion,useIsPresent,type MotionValue,type PanInfo,type Transition} from 'motion/react';
 import type {WebCharacter} from './lib/types';
 import {safeUrl} from './lib/config';
 import {Icon} from './components/Icons';
@@ -16,6 +16,13 @@ const webGallery='https://wkwxefckzwdlfrariqqn.supabase.co/storage/v1/object/pub
 const webMain:Record<number,string>={1:'Vivian_web_main.webp',2:'Yuffie_web_main.webp',3:'Eva_web_main.webp',4:'Nicole_web_main.webp'};
 const webCharacter:Record<number,string>={1:'Vivian_web_character.webp',2:'Yuffie_web_character.webp',3:'Eva_web_character.webp',4:'Nicole_web_character.webp'};
 const keyOf=(c:WebCharacter)=>String(c.character_i);
+const ages:Record<number,number>={1:26,2:23,3:25,4:39};
+const blurbs:Record<number,(t:(ru:string,en:string)=>string)=>string>={
+ 1:t=>t('Тихая роскошь и взгляд, который всё замечает.','Quiet luxury and a gaze that misses nothing.'),
+ 2:t=>t('Дерзкая, быстрая, на шаг впереди неприятностей.','Bold, quick, one step ahead of trouble.'),
+ 3:t=>t('Тёплая снаружи, расчётливая внутри. Никогда не спешит.','Warm outside, calculating inside. Never in a hurry.'),
+ 4:t=>t('Знает, чего хочет, и не тратит слов зря.','Knows what she wants and wastes no words.'),
+};
 function visible(node:HTMLElement|null,container?:HTMLElement|null){if(!node?.isConnected)return false;const r=node.getBoundingClientRect(),c=container?.getBoundingClientRect();return r.width>0&&r.height>0&&r.bottom>Math.max(0,c?.top??0)&&r.top<Math.min(innerHeight,c?.bottom??innerHeight)&&r.right>0&&r.left<innerWidth;}
 function Photo({character,layoutId,url=character.image_url}:{character:WebCharacter;layoutId?:string;url?:string|null}){
  const reduce=useReducedMotion(),source=safeUrl(url),[failed,setFailed]=useState(false);useEffect(()=>setFailed(false),[source]);
@@ -32,12 +39,20 @@ function Card({character,index,count,position,width,mobile,mode,active,shared,on
  const zIndex=useTransform(d,v=>100-Math.round(Math.abs(v)*20));
  const pointerEvents=useTransform(d,v=>mode==='swipe'&&mobile&&Math.abs(v)>=.999?'none':'auto');
  const transform=mode==='swipe'?{x,scale,rotateY,opacity,pointerEvents}:{};
+ const age=character?ages[character.character_i]:undefined;
+ const blurb=character?blurbs[character.character_i]?.(t):undefined;
+ const name=character?`${character.name}${age?`, ${age}`:''}`:'';
+ const blurbTransition:Transition=reduce?reducedTransition:{duration:.22,ease:[.22,1,.36,1],delay:.07};
+ const blurbExit:Transition=reduce?reducedTransition:{duration:.16};
  const choose=(e:React.MouseEvent<HTMLButtonElement>)=>{if(mode==='swipe'&&!active){onStep(distance(index,position.get(),count)<0?-1:1);return;}if(character)onOpen(character,e.currentTarget);else onVote();};
  return <motion.div layout={shared&&active} style={mode==='swipe'?{zIndex}:undefined} transition={reduce?reducedTransition:sharedTransition} className={`catalog-slot ${active?'catalog-selected':''}`} data-catalog-id={character?keyOf(character):'vote'} data-selected={active?'true':'false'}>
   <motion.div className="catalog-card-motion" style={transform}>
    {character?<button className={mode==='grid'?'grid-card':'swipe-card'} data-catalog-source={keyOf(character)} tabIndex={mode==='grid'||active?0:-1} aria-hidden={mode==='swipe'&&!active?true:undefined} onFocus={()=>mode==='grid'&&onFocus()} onClick={choose}>
     <Photo character={character} url={webMain[character.character_i]?webGallery+webMain[character.character_i]:character.image_url} layoutId={shared&&active?`catalog-photo-${character.character_i}`:undefined}/>
-    {mode==='grid'?<div className="grid-caption"><h2>{character.name}</h2><Icon name="arrow"/></div>:<div className="swipe-caption"><span className="eyebrow">{t('ПОЗНАКОМИТЬСЯ','MEET')}</span><h2>{character.name}</h2><p>{character.description}</p><span className="circle-link"><Icon name="arrow"/></span></div>}
+    {mode==='grid'?<div className="grid-caption"><h2>{name}</h2></div>:<div className="swipe-caption"><div className="swipe-caption-inner">
+     <motion.h2 initial={false} animate={{y:active?0:45,fontSize:active?27:19}} transition={reduce?reducedTransition:sharedTransition}>{name}</motion.h2>
+     <AnimatePresence initial={false}>{active&&blurb?<motion.p key="blurb" initial={reduce?false:{opacity:0,y:8}} animate={{opacity:1,y:0,transition:blurbTransition}} exit={{opacity:0,y:-6,transition:blurbExit}}>{blurb}</motion.p>:null}</AnimatePresence>
+    </div></div>}
    </button>:<button className={mode==='grid'?'vote-banner':'vote-card'} data-catalog-source="vote" tabIndex={mode==='grid'||active?0:-1} aria-hidden={mode==='swipe'&&!active?true:undefined} onFocus={()=>mode==='grid'&&onFocus()} onClick={choose}>
     {mode==='grid'?<><Icon name="spark"/><span>{t('Кого пригласим следующим?','Who should join next?')}<small>{t('Голосование за новых персонажей','Vote for new characters')}</small></span><Icon name="arrow"/></>:<><Icon name="spark" size={60}/><span className="eyebrow">{t('ПРОДОЛЖЕНИЕ СЛЕДУЕТ','TO BE CONTINUED')}</span><h2>{t('Кого-то\nне хватает?','Someone\nmissing?')}</h2><p>{t('Помоги выбрать следующего персонажа.','Help us choose the next character.')}</p><span className="circle-link"><Icon name="arrow"/></span></>}
    </button>}
@@ -65,11 +80,29 @@ export function Characters(p:Props){
  useLayoutEffect(()=>{const node=stage.current;if(!node)return;const measure=()=>setWidth(node.clientWidth);measure();const observer=new ResizeObserver(measure);observer.observe(node);return()=>observer.disconnect();},[Boolean(current),p.loading,p.characters.length]);
  useLayoutEffect(()=>{if(!current&&scroll.current)scroll.current.scrollTop=scrollPositions.current[mode];if(previousDetail.current!==null&&!current){restoreFocus.current=origin.current?.id??null;const node=root.current?.querySelector<HTMLButtonElement>(`[data-catalog-source="${restoreFocus.current}"]`);node?.focus({preventScroll:true});}if(current?.character_i!==previousDetail.current){setPhotoIndex(0);if(current)galleryButton.current?.focus({preventScroll:true});}previousDetail.current=current?.character_i??null;},[current?.character_i,mode]);
  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;stop();};},[stop]);
- const photos=current?[...new Set([webCharacter[current.character_i]?webGallery+webCharacter[current.character_i]:current.image_url,...(current.gallery_photos??[]),current.gallery_photo_url,current.menu_photo_url].filter((url):url is string=>Boolean(url&&safeUrl(url))))]:[];
+ const photos=current?(webMain[current.character_i]&&webCharacter[current.character_i]?[webGallery+webMain[current.character_i],webGallery+webCharacter[current.character_i]]:[...new Set([current.image_url,...(current.gallery_photos??[]),current.gallery_photo_url,current.menu_photo_url].filter((url):url is string=>Boolean(url&&safeUrl(url))))]):[];
  const shownPhoto=photos[photoIndex]??photos[0]??current?.image_url;
  useEffect(()=>{if(!current||!photos.length)return;const urls=[photos[wrap(photoIndex-1,photos.length)],photos[wrap(photoIndex+1,photos.length)]];for(const url of new Set(urls)){const image=new Image();image.src=url;}},[current?.character_i,shownPhoto]);
- const snap=(next:number,velocity=position.getVelocity())=>{stop();target.current=next;if(reduce){position.set(next);setMoving(false);return;}setMoving(true);animation.current=animate(position,next,{...carouselTransition,velocity,onComplete:()=>{animation.current=null;if(mounted.current)setMoving(false);}});};
+ const wheel=useRef({timer:0});
+ const snap=useCallback((next:number,velocity=position.getVelocity())=>{window.clearTimeout(wheel.current.timer);stop();target.current=next;if(reduce){position.set(next);setMoving(false);return;}setMoving(true);animation.current=animate(position,next,{...carouselTransition,velocity,onComplete:()=>{animation.current=null;if(mounted.current)setMoving(false);}});},[position,reduce,stop]);
  const step=(delta:number)=>snap(target.current+delta);
+ useEffect(()=>{
+  const node=stage.current;if(!node||mode!=='swipe')return;
+  const stride=Math.max(1,width*(mobile?.82:.33));
+  const onWheel=(event:WheelEvent)=>{
+   if(event.ctrlKey)return;
+   if(Math.abs(event.deltaX)<=Math.abs(event.deltaY)*1.2||Math.abs(event.deltaX)<=1)return;
+   event.preventDefault();
+   const unit=event.deltaMode===1?16:event.deltaMode===2?stride:1;
+   const current=position.get(),centre=Math.round(current);
+   const next=Math.max(centre-1,Math.min(centre+1,current+event.deltaX*unit/stride));
+   stop();setMoving(true);position.set(next);
+   window.clearTimeout(wheel.current.timer);
+   wheel.current.timer=window.setTimeout(()=>snap(Math.round(position.get())),140);
+  };
+  node.addEventListener('wheel',onWheel,{passive:false});
+  return()=>{node.removeEventListener('wheel',onWheel);window.clearTimeout(wheel.current.timer);};
+ },[mode,mobile,width,snap,stop,position,p.characters.length]);
  const selectGrid=(index:number)=>{selection.current=keys[index];target.current=index;position.set(index);setCenter(index);};
  const sourceNode=()=>root.current?.querySelector<HTMLElement>(`[data-catalog-source="${activeKey}"]`)??null;
  const toggle=()=>{suppressClick.current=false;stop();const next=Math.round(position.get());target.current=next;selection.current=keys[wrap(next,count)];setCenter(next);setMoving(false);setShared(visible(sourceNode(),scroll.current));if(scroll.current)scrollPositions.current[mode]=scroll.current.scrollTop;if(mode==='grid')position.set(next);setMode(value=>value==='swipe'?'grid':'swipe');};

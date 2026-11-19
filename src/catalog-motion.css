@@ -3,7 +3,7 @@
 .catalog-motion-root>section{position:absolute;inset:0}
 .characters-view .catalog-stage.carousel{touch-action:pan-y;isolation:isolate}
 .characters-view .catalog-stage .catalog-slot{position:relative;min-width:0}
-.characters-view .catalog-stage.carousel .catalog-slot{position:absolute;inset:0;width:28%;height:calc(100% - 80px);max-height:550px;margin:auto;pointer-events:none}
+.characters-view .catalog-stage.carousel .catalog-slot{position:absolute;left:50%;top:50%;translate:-50% -50%;width:auto;height:min(calc(100% - 80px),504px,47vw);aspect-ratio:3/4;pointer-events:none}
 .catalog-card-motion{position:relative;width:100%;height:100%;transform-origin:center;transform-style:preserve-3d}
 .characters-view .carousel .catalog-card-motion{pointer-events:auto;touch-action:pan-y}
 .characters-view .catalog-stage .swipe-card,.characters-view .catalog-stage .grid-card{width:100%;height:100%;transform:none;touch-action:pan-y}
@@ -15,10 +15,9 @@
 .catalog-detail-photo{position:absolute;inset:0;border-radius:inherit}
 .catalog-detail .character-gallery-photo{transform:none;touch-action:pan-y}
 .catalog-detail .back-to-choice{will-change:auto}
-@media(max-width:900px){.characters-view .catalog-stage.carousel .catalog-slot{width:34%}}
 @media(max-width:600px){
- .characters-view .catalog-stage.carousel .catalog-slot{width:74%;height:calc(100% - 65px);max-height:560px}
- .characters-view .catalog-stage.character-grid .catalog-slot{aspect-ratio:1}
+ .characters-view .catalog-stage.carousel .catalog-slot{height:min(calc(100% - 16px),112vw)}
+ .characters-view .catalog-stage.character-grid .catalog-slot{aspect-ratio:3/4}
  .catalog-detail .character-gallery{touch-action:pan-y}
 }
 @media(max-height:700px) and (max-width:600px){.characters-view .catalog-stage.carousel .catalog-slot{height:calc(100% - 30px)}}
