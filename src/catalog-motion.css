@@ -1,7 +1,7 @@
 /* Catalogue geometry overrides only; brand colours and type remain shared tokens. */
 .catalog-motion-root{height:100%;min-height:0;position:relative}
 .catalog-motion-root>section{position:absolute;inset:0}
-.characters-view .catalog-stage.carousel{touch-action:pan-y;isolation:isolate}
+.characters-view .catalog-stage.carousel{touch-action:pan-y;overscroll-behavior-x:contain;isolation:isolate}
 .characters-view .catalog-stage .catalog-slot{position:relative;min-width:0}
 .characters-view .catalog-stage.carousel .catalog-slot{position:absolute;left:50%;top:50%;translate:-50% -50%;width:auto;height:min(calc(100% - 80px),504px,47vw);aspect-ratio:3/4;pointer-events:none}
 .catalog-card-motion{position:relative;width:100%;height:100%;transform-origin:center;transform-style:preserve-3d}
