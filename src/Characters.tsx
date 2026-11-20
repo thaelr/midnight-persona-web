@@ -3,6 +3,7 @@ import {useEffect,useLayoutEffect,useState,useRef,useCallback,type ReactNode,typ
 import {motion,AnimatePresence,LayoutGroup,animate,useMotionValue,useMotionValueEvent,useTransform,useReducedMotion,useIsPresent,type MotionValue,type PanInfo,type Transition} from 'motion/react';
 import type {WebCharacter} from './lib/types';
 import {safeUrl} from './lib/config';
+import {cardDescription} from './lib/cardDescription';
 import {Icon} from './components/Icons';
 import {carouselTransition,sharedTransition,shortTransition,reducedTransition} from './lib/motion';
 import './catalog-motion.css';
@@ -17,15 +18,6 @@ const webMain:Record<number,string>={1:'Vivian_web_main.webp',2:'Yuffie_web_main
 const webCharacter:Record<number,string>={1:'Vivian_web_character.webp',2:'Yuffie_web_character.webp',3:'Eva_web_character.webp',4:'Nicole_web_character.webp'};
 const keyOf=(c:WebCharacter)=>String(c.character_i);
 const ages:Record<number,number>={1:26,2:23,3:25,4:39};
-/** Keep the heading's own `Name, age` line from repeating at the start of the author description. */
-function cardDescription(character:WebCharacter,age?:number){
- const text=character.description.trim();
- if(!age)return text;
- const lead=`${character.name}, ${age}`;
- if(!text.startsWith(lead))return text;
- const rest=text.slice(lead.length).replace(/^[\s.,،:;—-]+/,'').trim();
- return rest||text;
-}
 function visible(node:HTMLElement|null,container?:HTMLElement|null){if(!node?.isConnected)return false;const r=node.getBoundingClientRect(),c=container?.getBoundingClientRect();return r.width>0&&r.height>0&&r.bottom>Math.max(0,c?.top??0)&&r.top<Math.min(innerHeight,c?.bottom??innerHeight)&&r.right>0&&r.left<innerWidth;}
 function Photo({character,layoutId,url=character.image_url}:{character:WebCharacter;layoutId?:string;url?:string|null}){
  const reduce=useReducedMotion(),source=safeUrl(url),[failed,setFailed]=useState(false);useEffect(()=>setFailed(false),[source]);
