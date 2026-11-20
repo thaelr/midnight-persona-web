@@ -17,12 +17,15 @@ const webMain:Record<number,string>={1:'Vivian_web_main.webp',2:'Yuffie_web_main
 const webCharacter:Record<number,string>={1:'Vivian_web_character.webp',2:'Yuffie_web_character.webp',3:'Eva_web_character.webp',4:'Nicole_web_character.webp'};
 const keyOf=(c:WebCharacter)=>String(c.character_i);
 const ages:Record<number,number>={1:26,2:23,3:25,4:39};
-const blurbs:Record<number,(t:(ru:string,en:string)=>string)=>string>={
- 1:t=>t('Тихая роскошь и взгляд, который всё замечает.','Quiet luxury and a gaze that misses nothing.'),
- 2:t=>t('Дерзкая, быстрая, на шаг впереди неприятностей.','Bold, quick, one step ahead of trouble.'),
- 3:t=>t('Тёплая снаружи, расчётливая внутри. Никогда не спешит.','Warm outside, calculating inside. Never in a hurry.'),
- 4:t=>t('Знает, чего хочет, и не тратит слов зря.','Knows what she wants and wastes no words.'),
-};
+/** Keep the heading's own `Name, age` line from repeating at the start of the author description. */
+function cardDescription(character:WebCharacter,age?:number){
+ const text=character.description.trim();
+ if(!age)return text;
+ const lead=`${character.name}, ${age}`;
+ if(!text.startsWith(lead))return text;
+ const rest=text.slice(lead.length).replace(/^[\s.,،:;—-]+/,'').trim();
+ return rest||text;
+}
 function visible(node:HTMLElement|null,container?:HTMLElement|null){if(!node?.isConnected)return false;const r=node.getBoundingClientRect(),c=container?.getBoundingClientRect();return r.width>0&&r.height>0&&r.bottom>Math.max(0,c?.top??0)&&r.top<Math.min(innerHeight,c?.bottom??innerHeight)&&r.right>0&&r.left<innerWidth;}
 function Photo({character,layoutId,url=character.image_url}:{character:WebCharacter;layoutId?:string;url?:string|null}){
  const reduce=useReducedMotion(),source=safeUrl(url),[failed,setFailed]=useState(false);useEffect(()=>setFailed(false),[source]);
@@ -40,7 +43,7 @@ function Card({character,index,count,position,width,mobile,mode,active,shared,on
  const pointerEvents=useTransform(d,v=>mode==='swipe'&&mobile&&Math.abs(v)>=.999?'none':'auto');
  const transform=mode==='swipe'?{x,scale,rotateY,opacity,pointerEvents}:{};
  const age=character?ages[character.character_i]:undefined;
- const blurb=character?blurbs[character.character_i]?.(t):undefined;
+ const blurb=character?cardDescription(character,age):undefined;
  const name=character?`${character.name}${age?`, ${age}`:''}`:'';
  const blurbTransition:Transition=reduce?reducedTransition:{duration:.22,ease:[.22,1,.36,1],delay:.07};
  const blurbExit:Transition=reduce?reducedTransition:{duration:.16};
